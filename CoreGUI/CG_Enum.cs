@@ -21,7 +21,7 @@ public static partial class CoreGUI
             int x = i % col, y = i / col;
             if (x == 0)
             {
-                r = PrefixLabel(Indent(Reserve()), y == 0 ? label : GUIContent.none);
+                r = PrefixLabel(Reserve(), y == 0 ? label : GUIContent.none);
                 r.width /= col;
             }
             else
