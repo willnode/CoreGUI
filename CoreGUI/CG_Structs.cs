@@ -14,7 +14,23 @@ public static partial class CoreGUI
 
     public static Rect RectField(GUIContent label, Rect rect)
     {
-        return new Rect();
+        BeginHorizontal(label);
+        BeginLabelOption(16, Side.Left);
+        BeginVertical();
+        {
+            rect.x = FloatField(C("X"), rect.x);
+            rect.width = FloatField(C("W"), rect.width);
+        }
+        EndVertical();
+        BeginVertical();
+        {
+            rect.y = FloatField(C("Y"), rect.y);
+            rect.height = FloatField(C("H"), rect.height);
+        }
+        EndVertical();
+        EndLabelOption();
+        EndHorizontal();
+        return rect;
     }
     
     public static Quaternion QuaternionField(GUIContent label, Rect rect, bool raw = false)

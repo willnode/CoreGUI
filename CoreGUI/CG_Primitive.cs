@@ -30,20 +30,22 @@ public static partial class CoreGUI
 
     static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser)
     {
-        var r = PrefixLabel(Reserve(), label);
+        var r = PrefixLabel(Reserve(null, GUI.skin.textField), label);
         BeginChangeCheck();
 
-        if(lastNumberAnyID != GUIUtility.keyboardControl)
+        var id = GUIUtility.GetControlID(FocusType.Passive);
+
+        if (lastNumberAnyID != GUIUtility.keyboardControl)
         {
             lastNumberAnyID = GUIUtility.keyboardControl;
             lastNumberID = -1;
         }
 
-        var v = GUI.TextField(r, lastNumberID == GUIUtility.keyboardControl ? lastNumberStr : value.ToString());
+        var v = GUI.TextField(r, lastNumberID == id ? lastNumberStr : value.ToString());
 
         if (EndChangeCheck())
         {
-            lastNumberID = GUIUtility.keyboardControl;
+            lastNumberID = id;
 
             T f;
             lastNumberStr = v;
@@ -76,6 +78,14 @@ public static partial class CoreGUI
         var r = PrefixLabel(Reserve(), label);
         return GUI.TextField(r, value);
     }
+
+
+    public static string PasswordField(GUIContent label, string value, char maskChar)
+    {
+        var r = PrefixLabel(Reserve(), label);
+        return GUI.PasswordField(r, value ?? "", maskChar);
+    }
+
 
     public static string StringArea(GUIContent label, string value)
     {
