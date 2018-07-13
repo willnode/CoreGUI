@@ -10,6 +10,32 @@ public static partial class CoreGUI {
 
     public static int guiIndent = 0;
 
+    public static GUIIndentPolicy guiIndentPolicy = GUIIndentPolicy.Widgets;
+
+    public enum GUIIndentPolicy
+    {
+        /// <summary>
+        /// Apply indentation only to labelled widgets
+        /// </summary>
+        Label = 0,
+        /// <summary>
+        /// Apply indentation to widgets both labelled and unlabelled widgets
+        /// </summary>
+        Widgets = 1,
+        /// <summary>
+        /// Always prefix widgets even if there's no label before it
+        /// </summary>
+        Full = 2,
+        /// <summary>
+        /// Disable indenting
+        /// </summary>
+        None = 3,
+        /// <summary>
+        /// Used only for BeginIndent. Use previous setting.
+        /// </summary>
+        Inherit = -1,
+    }
+
     public static GUILayoutOption[] layoutOptions = new GUILayoutOption[] {  };
 
     public static Rect PrefixLabel(Rect totalPosition, GUIContent label)
@@ -18,19 +44,28 @@ public static partial class CoreGUI {
         {
             var r = totalPosition;
             r.width = prefixLabelWidth;
-            r.xMin = guiIndent * 16;
+            r.xMin = guiIndentPolicy == GUIIndentPolicy.None ? 0 : guiIndent * 16;
             r.height = GUI.skin.label.CalcHeight(label, r.width);
             if (Event.current.type == EventType.Repaint)
                 GUI.Label(r, label);
 
             totalPosition.xMin += prefixLabelWidth;
         }
+        else if (guiIndentPolicy == GUIIndentPolicy.Full)
+            totalPosition.xMin += prefixLabelWidth;
+        else if (guiIndentPolicy == GUIIndentPolicy.Widgets)
+            totalPosition.xMin += guiIndent * 16;
+
         return totalPosition;
     }
 
-    static Rect Indent(Rect r)
+    static Rect Indent(Rect r, bool ignorePolicy = false)
     {
-        r.xMin += guiIndent * 16;
+        if (guiIndentPolicy == GUIIndentPolicy.Widgets || ignorePolicy)
+            r.xMin += guiIndent * 16;
+        else if (guiIndentPolicy == GUIIndentPolicy.Full)
+            r.xMin += prefixLabelWidth;
+         
         return r;
     }
 
@@ -56,14 +91,22 @@ public static partial class CoreGUI {
         return _cachedGUI;
     }
 
-    public static void BeginHorizontal()
+    public static void BeginHorizontal(GUIContent label = null)
     {
-        GUILayout.BeginHorizontal();
+        BeginIndent(label == null ? GUIIndentPolicy.Inherit : GUIIndentPolicy.None);
+        if (label != null)
+        {
+            var r = PrefixLabel(Reserve(Vector2.zero), label);
+            GUILayout.BeginHorizontal();
+            GUILayoutUtility.GetRect(0, 0, GUILayout.Width(r.xMin));
+        } else
+            GUILayout.BeginHorizontal();
     }
 
     public static void EndHorizontal()
     {
         GUILayout.EndHorizontal();
+        EndIndent();
     }
     
     public static void BeginVertical()
@@ -129,9 +172,25 @@ public static partial class CoreGUI {
         layoutOptions = layoutStacks.Pop();
     }
 
+    static Stack<GUIIndentPolicy> guiIndentPolicies = new Stack<GUIIndentPolicy>();
+
+    public static void BeginIndent(GUIIndentPolicy policy = GUIIndentPolicy.Inherit)
+    {
+        guiIndent++;
+        guiIndentPolicies.Push(guiIndentPolicy);
+        if (policy != GUIIndentPolicy.Inherit)
+            guiIndentPolicy = policy;
+    }
+    
+    public static void EndIndent()
+    {
+        guiIndent--;
+        guiIndentPolicy = guiIndentPolicies.Pop();
+    }
+
     public static bool Button(GUIContent label)
     {
-        return GUI.Button(Reserve(label), label);
+        return GUI.Button(Indent(Reserve(label)), label);
     }
 
     public static bool RepeatButton(GUIContent label)

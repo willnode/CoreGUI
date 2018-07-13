@@ -7,79 +7,68 @@ using UnityEngine;
 public static partial class CoreGUI
 {
 
-    static double lastDoubleFail = double.NaN;
-    static string lastDoubleFailStr;
-
     public static double DoubleField(GUIContent label, double value)
     {
-        var r = PrefixLabel(Reserve(), label);
-        var v = GUI.TextField(r, lastDoubleFail == value ? lastDoubleFailStr : value.ToString());
-        if (GUI.changed)
-        {
-            double f;
-            if (double.TryParse(v, out f))
-            {
-                lastDoubleFailStr = v;
-                lastDoubleFail = value;
-                return f;
-            }
-            else
-            {
-                lastDoubleFailStr = v;
-                lastDoubleFail = value;
-            }
-        }
-        return value;
+        return NumberField(label, value, double.TryParse);
     }
-
-    static float lastFloatFail = float.NaN;
-    static string lastFloatFailStr;
 
     public static float FloatField(GUIContent label, float value)
     {
-        var r = PrefixLabel(Reserve(), label);
-        var v = GUI.TextField(r, lastFloatFail == value ? lastFloatFailStr : value.ToString());
-        if (GUI.changed)
-        {
-            float f;
-            if (float.TryParse(v, out f))
-            {
-                lastFloatFailStr = v;
-                lastFloatFail = value;
-                return f;
-            }
-            else
-            {
-                lastFloatFailStr = v;
-                lastFloatFail = value;
-            }
-        }
-        return value;
+        return NumberField(label, value, float.TryParse);
     }
-
-    static int lastIntFail = 0;
-    static string lastIntFailStr;
 
     public static int IntField(GUIContent label, int value)
     {
+        return NumberField(label, value, int.TryParse);
+    }
+    
+    public delegate bool TryParseFunc<T2>(string s, out T2 result);
+
+    static string lastNumberStr;
+    static int lastNumberID;
+    static int lastNumberAnyID;
+
+    static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser)
+    {
         var r = PrefixLabel(Reserve(), label);
-        var v = GUI.TextField(r, lastIntFail == value ? lastIntFailStr : value.ToString());
-        if (GUI.changed)
+        BeginChangeCheck();
+
+        if(lastNumberAnyID != GUIUtility.keyboardControl)
         {
-            int f;
-            if (int.TryParse(v, out f))
-            {
-                lastIntFailStr = v;
-                lastIntFail = value;
-                return f;
-            }
-            else
-            {
-                lastIntFailStr = v;
-                lastIntFail = value;
-            }
+            lastNumberAnyID = GUIUtility.keyboardControl;
+            lastNumberID = -1;
         }
+
+        var v = GUI.TextField(r, lastNumberID == GUIUtility.keyboardControl ? lastNumberStr : value.ToString());
+
+        if (EndChangeCheck())
+        {
+            lastNumberID = GUIUtility.keyboardControl;
+
+            T f;
+            lastNumberStr = v;
+
+            if (parser(v, out f))
+                return f;
+            else if (v.Length == 0)
+                 return default(T);
+        }
+
         return value;
+    }
+    
+    static public float HorizontalSlider(GUIContent label, float value, float min, float max)
+    {
+        var r = PrefixLabel(Reserve(), label);
+        r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
+        return GUI.HorizontalSlider(r, value, min, max);
+    }
+    
+    static public int HorizontalSlider(GUIContent label, int value, int min, int max)
+    {
+        var r = PrefixLabel(Reserve(), label);
+        r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
+        return Mathf.RoundToInt(GUI.HorizontalSlider(r, value, min, max));
     }
 
     public static string StringField(GUIContent label, string value)
