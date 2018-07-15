@@ -7,6 +7,34 @@ using UnityEngine;
 public static partial class CoreGUI
 {
 
+    static public float FloatSlider(GUIContent label, float value, float min, float max)
+    {
+        BeginHorizontal(label);
+        value = HorizontalSlider(null, value, min, max);
+        BeginLayoutOption(GUILayout.Width(80));
+        BeginChangeCheck();
+        value = FloatField(null, value);
+        if (EndChangeCheck())
+            value = Mathf.Clamp(value, min, max);
+        EndLayoutOption();
+        EndHorizontal();
+        return value;
+    }
+
+    static public int IntSlider(GUIContent label, int value, int min, int max)
+    {
+        BeginHorizontal(label);
+        value = HorizontalSlider(null, value, min, max);
+        BeginLayoutOption(GUILayout.Width(80));
+        BeginChangeCheck();
+        value = IntField(null, value);
+        if (EndChangeCheck())
+            value = Mathf.Clamp(value, min, max);
+        EndLayoutOption();
+        EndHorizontal();
+        return value;
+    }
+
     public static double DoubleField(GUIContent label, double value)
     {
         return NumberField(label, value, double.TryParse);
@@ -73,26 +101,24 @@ public static partial class CoreGUI
         return Mathf.RoundToInt(GUI.HorizontalSlider(r, value, min, max));
     }
 
-    public static string StringField(GUIContent label, string value)
+    public static string TextField(GUIContent label, string value)
     {
         var r = PrefixLabel(Reserve(), label);
         return GUI.TextField(r, value);
     }
-
-
+    
     public static string PasswordField(GUIContent label, string value, char maskChar)
     {
         var r = PrefixLabel(Reserve(), label);
         return GUI.PasswordField(r, value ?? "", maskChar);
     }
-
-
-    public static string StringArea(GUIContent label, string value)
+    
+    public static string TextArea(GUIContent label, string value)
     {
-        return StringArea(label, value, 0, int.MaxValue);
+        return TextArea(label, value, 0, int.MaxValue);
     }
     
-    public static string StringArea(GUIContent label, string value, int minLines, int maxLines, bool scrollBar = true)
+    public static string TextArea(GUIContent label, string value, int minLines, int maxLines, bool scrollBar = true)
     {
         BeginLayoutOption(GUILayout.ExpandWidth(true));
         var r = PrefixLabel(Reserve(Vector2.zero), label);

@@ -39,18 +39,18 @@ public static partial class CoreGUI
 
     public static bool Toggle(GUIContent label, bool value)
     {
-        return GUI.Toggle(Indent(Reserve(label, GUI.skin.toggle)), value, label);
+        return GUI.Toggle(Indent(Reserve(label, GUI.skin.toggle)), value, label ?? GUIContent.none);
     }
 
     public static bool Toggle(GUIContent label, bool value, GUIStyle style)
     {
-        return GUI.Toggle(Indent(Reserve(label, style)), value, label, style);
+        return GUI.Toggle(Indent(Reserve(label, style)), value, label ?? GUIContent.none, style);
     }
 
     public static bool Toggle(GUIContent label, bool value, GUIContent prefix)
     {
         var r = PrefixLabel(Reserve(label, GUI.skin.toggle), prefix);
-        return GUI.Toggle(r, value, label);
+        return GUI.Toggle(r, value, label ?? GUIContent.none);
     }
 
     public static bool Checkbox(GUIContent label, bool value)
@@ -70,8 +70,20 @@ public static partial class CoreGUI
 
     public static void Label(GUIContent label, GUIContent prefix)
     {
-        var r = PrefixLabel(Reserve(), prefix);
+        var r = PrefixLabel(Reserve(label), prefix);
         GUI.Label(r, label);
+    }
+    
+    public static bool Foldout(GUIContent label, bool expanded)
+    {
+        PrefixFoldout(Reserve(label), label, ref expanded);
+        return expanded;
+    }
+
+    public static bool Foldout(GUIContent label, ref bool expanded)
+    {
+        PrefixFoldout(Reserve(label), label, ref expanded);
+        return expanded;
     }
 
 }
