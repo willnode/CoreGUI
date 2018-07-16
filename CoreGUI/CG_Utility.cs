@@ -22,6 +22,35 @@ public static partial class CoreGUI
         }
     }
 
+    public static class Utility
+    {
+        /// <summary>
+        /// Get Rect from Current BeginArea/BeginHorizontal/BeginVertical
+        /// </summary>
+        public static Rect GetTopLayoutRect()
+        {
+            return (Rect)topLevelRect.GetValue(topLevel());
+        }
+
+        public static bool GetTopLayoutIsVertical()
+        {
+            return (bool)topLevelIsVertical.GetValue(topLevel());
+        }
+
+        static Func<object> topLevel;
+
+        static FieldInfo topLevelRect;
+
+        static FieldInfo topLevelIsVertical;
+
+        static Utility()
+        {
+            var m = typeof(GUILayoutUtility).GetMethod("get_topLevel", BindingFlags.NonPublic | BindingFlags.Static);
+            topLevel = (Func<object>)Delegate.CreateDelegate(typeof(Func<object>), m);
+            topLevelRect = m.ReturnType.GetField("rect");
+            topLevelIsVertical = m.ReturnType.GetField("isVertical");
+        }
+    }
 
     public enum IndentPolicy
     {

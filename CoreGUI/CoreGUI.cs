@@ -179,14 +179,14 @@ public static partial class CoreGUI
         _cachedTextGUI.text = text;
         return _cachedTextGUI;
     }
-    
+
     public static GUIContent C(string text, string tooltip)
     {
         _cachedTextTooltipGUI.text = text;
         _cachedTextTooltipGUI.tooltip = tooltip;
         return _cachedTextTooltipGUI;
     }
-    
+
     public static GUIContent C(Texture image)
     {
         _cachedTextureGUI.image = image;
@@ -289,6 +289,60 @@ public static partial class CoreGUI
     public static void EndLayoutOption()
     {
         layoutOptions = layoutStacks.Pop();
+    }
+
+    static Dictionary<int, float> _fadeTimes = new Dictionary<int, float>();
+
+    public static bool BeginFadeGroup(bool val)
+    {
+        var id = GUIUtility.GetControlID(FocusType.Passive);
+        var fade = _fadeTimes.ContainsKey(id) ? _fadeTimes[id] : _fadeTimes[id] = (val ? 1 : 0);
+
+        if (!val && fade <= 0)
+        {
+            BeginFadeGroup(0);
+            return false;
+        }
+        else if (val && fade >= 1)
+        {
+            BeginFadeGroup(1);
+            return true;
+        }
+        else
+        {
+            fade += (val ? 1 : -1) * Time.unscaledDeltaTime;
+            fade = Mathf.Clamp(fade, 0, 1);
+            _fadeTimes[id] = fade;
+            BeginFadeGroup(fade);
+            return fade > 0;
+        }
+    }
+
+    public static bool BeginFadeGroup(float fade)
+    {
+        if (Utility.GetTopLayoutIsVertical())
+            GUILayout.BeginVertical();
+        else
+            GUILayout.BeginHorizontal();
+
+        var rr = Utility.GetTopLayoutRect();
+
+        if (ev.type != EventType.Layout)
+            rr.height *= fade;
+
+        Debug.Log(rr);
+        GUI.BeginGroup(rr);
+        return fade > 0;
+    }
+
+    public static void EndFadeGroup()
+    {
+        GUI.EndGroup();
+        if (Utility.GetTopLayoutIsVertical())
+            GUILayout.EndVertical();
+        else
+            GUILayout.EndHorizontal();
+
     }
 
     static Stack<ValueTuple<int, IndentPolicy>> guiIndentPolicies = new Stack<ValueTuple<int, IndentPolicy>>();

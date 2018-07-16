@@ -136,12 +136,13 @@ public static partial class CoreGUI
                 Reserve(new Vector2(0, s2));
                 r.height = s2;
                 r.width -= 14;
+                    
                 var text = GUI.TextArea(r, value);
                 TextEditor editor = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
 
-                if (editor.text == null || editor.text != text)
+                if (editor.position != r)
                     return text; //Maybe we catch the wrong one?
-
+                
                 r.width += 14;
                 r.xMin = r.xMax - 14;
                 s = style.CalcHeight(C(value), r.width - 14f);
