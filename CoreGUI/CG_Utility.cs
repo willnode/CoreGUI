@@ -24,31 +24,26 @@ public static partial class CoreGUI
 
     public static class Utility
     {
-        /// <summary>
-        /// Get Rect from Current BeginArea/BeginHorizontal/BeginVertical
-        /// </summary>
-        public static Rect GetTopLayoutRect()
-        {
-            return (Rect)topLevelRect.GetValue(topLevel());
-        }
 
-        public static bool GetTopLayoutIsVertical()
-        {
-            return (bool)topLevelIsVertical.GetValue(topLevel());
-        }
+        public static float pixelsPerPoint { get { return _pixelsPerPoint(); } }
 
-        static Func<object> topLevel;
+        public static Func<float> _pixelsPerPoint;
 
-        static FieldInfo topLevelRect;
+        public static GUIStyle spaceStyle { get; internal set; }
 
-        static FieldInfo topLevelIsVertical;
-
+        static Func<GUIStyle, GUIContent, Vector2, Vector2> calcSizeWithConstraints;
+        
         static Utility()
         {
-            var m = typeof(GUILayoutUtility).GetMethod("get_topLevel", BindingFlags.NonPublic | BindingFlags.Static);
-            topLevel = (Func<object>)Delegate.CreateDelegate(typeof(Func<object>), m);
-            topLevelRect = m.ReturnType.GetField("rect");
-            topLevelIsVertical = m.ReturnType.GetField("isVertical");
+            var m = typeof(GUIStyle).GetMethod("CalcSizeWithConstraints", BindingFlags.NonPublic | BindingFlags.Instance);
+            calcSizeWithConstraints = (Func<GUIStyle, GUIContent, Vector2, Vector2>)Delegate.CreateDelegate(typeof(Func<GUIStyle, GUIContent, Vector2, Vector2>), m);
+            var f = typeof(GUIUtility).GetMethod("get_pixelsPerPoint", BindingFlags.NonPublic | BindingFlags.Static);
+            _pixelsPerPoint = (Func<float>)Delegate.CreateDelegate(typeof(Func<float>), f);
+        }
+
+        public static Vector2 CalcSizeWithConstraints(GUIStyle style, GUIContent content, Vector2 constraints)
+        {
+            return calcSizeWithConstraints(style, content, constraints);
         }
     }
 

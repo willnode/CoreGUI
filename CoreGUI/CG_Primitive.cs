@@ -11,7 +11,7 @@ public static partial class CoreGUI
     {
         BeginHorizontal(label);
         value = HorizontalSlider(null, value, min, max);
-        BeginLayoutOption(GUILayout.Width(80));
+        BeginLayoutOption(Layout.Width(80));
         BeginChangeCheck();
         value = FloatField(null, value);
         if (EndChangeCheck())
@@ -25,7 +25,7 @@ public static partial class CoreGUI
     {
         BeginHorizontal(label);
         value = HorizontalSlider(null, value, min, max);
-        BeginLayoutOption(GUILayout.Width(80));
+        BeginLayoutOption(Layout.Width(80));
         BeginChangeCheck();
         value = IntField(null, value);
         if (EndChangeCheck())
@@ -120,7 +120,7 @@ public static partial class CoreGUI
     
     public static string TextArea(GUIContent label, string value, int minLines, int maxLines, bool scrollBar = true)
     {
-        BeginLayoutOption(GUILayout.ExpandWidth(true));
+        BeginLayoutOption(Layout.ExpandWidth(true));
         var r = PrefixLabel(Reserve(Vector2.zero), label);
         EndLayoutOption();
 
