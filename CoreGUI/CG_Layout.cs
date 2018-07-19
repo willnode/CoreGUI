@@ -333,6 +333,8 @@ public static partial class CoreGUI
             }
             current.layoutGroups.Push(g);
             current.topLevel = g;
+            //if (ev.type == EventType.Repaint)
+            //    Styles.Box.Draw(g.rect, false, false, false, false);
             return g;
         }
 
@@ -352,7 +354,7 @@ public static partial class CoreGUI
 
             current.layoutGroups.Pop();
             if (0 < current.layoutGroups.Count)
-                current.topLevel = (LayoutGroup)current.layoutGroups.Peek();
+                current.topLevel = current.layoutGroups.Peek();
             else
                 current.topLevel = new LayoutGroup();
         }
@@ -415,10 +417,10 @@ public static partial class CoreGUI
                                 switch (option.type)
                                 {
                                     case LayoutOption.Type.maxHeight:
-                                        sizeConstraints.y = (float)option.value;
+                                        sizeConstraints.y = option.value;
                                         break;
                                     case LayoutOption.Type.maxWidth:
-                                        sizeConstraints.x = (float)option.value;
+                                        sizeConstraints.x = option.value;
                                         break;
                                 }
                             }
@@ -467,6 +469,19 @@ public static partial class CoreGUI
                     return kDummyRect;
                 default:
                     return current.topLevel.GetNext().rect;
+            }
+        }
+
+        // Get the rectangle of current layout group.
+        public static Rect GetContainerRect()
+        {
+            switch (Event.current.type)
+            {
+                case EventType.Layout:
+                case EventType.Used:
+                    return kDummyRect;
+                default:
+                    return current.topLevel.rect;
             }
         }
 
@@ -525,8 +540,8 @@ public static partial class CoreGUI
         public bool isWindow = false;                   // Is this a window at all?
         public int windowID = -1;                           // Optional window ID for toplevel windows. Used by Layout to tell GUI.Window of size changes...
         int m_Cursor = 0;
-        protected int m_StretchableCountX = 100;
-        protected int m_StretchableCountY = 100;
+        protected float m_StretchableCountX = 100;
+        protected float m_StretchableCountY = 100;
         protected bool m_UserSpecifiedWidth = false;
         protected bool m_UserSpecifiedHeight = false;
         // Should all elements be the same size?
@@ -606,7 +621,7 @@ public static partial class CoreGUI
         {
             if (m_Cursor < entries.Count)
             {
-                LayoutEntry e = (LayoutEntry)entries[m_Cursor];
+                LayoutEntry e = entries[m_Cursor];
                 return e.rect;
             }
 
@@ -617,7 +632,7 @@ public static partial class CoreGUI
         {
             if (m_Cursor < entries.Count)
             {
-                LayoutEntry e = (LayoutEntry)entries[m_Cursor];
+                LayoutEntry e = entries[m_Cursor];
                 m_Cursor++;
                 return e;
             }
@@ -636,7 +651,7 @@ public static partial class CoreGUI
 
             if (m_Cursor <= entries.Count)
             {
-                LayoutEntry e = (LayoutEntry)entries[m_Cursor - 1];
+                LayoutEntry e = entries[m_Cursor - 1];
                 return e.rect;
             }
 
@@ -670,7 +685,7 @@ public static partial class CoreGUI
                 {
                     i.CalcWidth();
                     RectOffset margins = i.margin;
-                    if (i.style != Utility.spaceStyle)
+                    if (i.style != LayoutUtility.spaceStyle)
                     {
                         if (!first)
                         {
@@ -703,7 +718,7 @@ public static partial class CoreGUI
 
                     // Specialcase spaceStyle - instead of handling margins normally, we just want to insert the size...
                     // This ensure that Space(1) adds ONE space, and doesn't prevent margin collapses
-                    if (i.style != Utility.spaceStyle)
+                    if (i.style != LayoutUtility.spaceStyle)
                     {
                         if (!first)
                             margin = lastMargin > m.left ? lastMargin : m.left;
@@ -854,7 +869,7 @@ public static partial class CoreGUI
                 {
                     if (m_StretchableCountX > 0)
                     {
-                        perItemStretch = (widthToDistribute - m_ChildMaxWidth) / (float)m_StretchableCountX;
+                        perItemStretch = (widthToDistribute - m_ChildMaxWidth) / m_StretchableCountX;
                     }
                 }
 
@@ -869,7 +884,7 @@ public static partial class CoreGUI
                     //              Debug.Log (i.minWidth);
                     thisWidth += perItemStretch * i.stretchWidth;
 
-                    if (i.style != Utility.spaceStyle) // Skip margins on spaces.
+                    if (i.style != LayoutUtility.spaceStyle) // Skip margins on spaces.
                     {
                         int leftMargin = i.margin.left;
                         if (firstMargin)
@@ -896,12 +911,12 @@ public static partial class CoreGUI
                 return;
             }
 
-            int topMarginMin = 0;
-            int bottomMarginMin = 0;
+                int topMarginMin = 0;
+                int bottomMarginMin = 0;
 
-            m_ChildMinHeight = 0;
-            m_ChildMaxHeight = 0;
-            m_StretchableCountY = 0;
+                m_ChildMinHeight = 0;
+                m_ChildMaxHeight = 0;
+                m_StretchableCountY = 0;
 
             if (isVertical)
             {
@@ -915,7 +930,7 @@ public static partial class CoreGUI
 
                     // Specialcase spaces - it's a space, so instead of handling margins normally, we just want to insert the size...
                     // This ensure that Space(1) adds ONE space, and doesn't prevent margin collapses
-                    if (i.style != Utility.spaceStyle)
+                    if (i.style != LayoutUtility.spaceStyle)
                     {
                         if (!first)
                             margin = Mathf.Max(lastMargin, m.top);
@@ -957,7 +972,7 @@ public static partial class CoreGUI
                 {
                     i.CalcHeight();
                     RectOffset margins = i.margin;
-                    if (i.style != Utility.spaceStyle)
+                    if (i.style != LayoutUtility.spaceStyle)
                     {
                         if (!first)
                         {
@@ -1058,7 +1073,7 @@ public static partial class CoreGUI
                 if (heightToDistribute > m_ChildMaxHeight)          // If we have too much space - stretch any stretchable children
                 {
                     if (m_StretchableCountY > 0)
-                        perItemStretch = (heightToDistribute - m_ChildMaxHeight) / (float)m_StretchableCountY;
+                        perItemStretch = (heightToDistribute - m_ChildMaxHeight) / m_StretchableCountY;
                 }
 
                 // Set the positions
@@ -1069,7 +1084,7 @@ public static partial class CoreGUI
                     float thisHeight = Mathf.Lerp(i.minHeight, i.maxHeight, minMaxScale);
                     thisHeight += perItemStretch * i.stretchHeight;
 
-                    if (i.style != Utility.spaceStyle)
+                    if (i.style != LayoutUtility.spaceStyle)
                     {   // Skip margins on spaces.
                         int topMargin = i.margin.top;
                         if (firstMargin)
@@ -1144,7 +1159,7 @@ public static partial class CoreGUI
         public Rect rect = new Rect(0, 0, 0, 0);
 
         // Can this element stretch?
-        public int stretchWidth, stretchHeight;
+        public float stretchWidth, stretchHeight;
 
         // The style to use.
         GUIStyle m_Style = GUIStyle.none;
@@ -1202,14 +1217,14 @@ public static partial class CoreGUI
             {
                 switch (i.type)
                 {
-                    case LayoutOption.Type.fixedWidth: minWidth = maxWidth = (float)i.value; stretchWidth = 0; break;
-                    case LayoutOption.Type.fixedHeight: minHeight = maxHeight = (float)i.value; stretchHeight = 0; break;
-                    case LayoutOption.Type.minWidth: minWidth = (float)i.value; if (maxWidth < minWidth) maxWidth = minWidth; break;
-                    case LayoutOption.Type.maxWidth: maxWidth = (float)i.value; if (minWidth > maxWidth) minWidth = maxWidth; stretchWidth = 0; break;
-                    case LayoutOption.Type.minHeight: minHeight = (float)i.value; if (maxHeight < minHeight) maxHeight = minHeight; break;
-                    case LayoutOption.Type.maxHeight: maxHeight = (float)i.value; if (minHeight > maxHeight) minHeight = maxHeight; stretchHeight = 0; break;
-                    case LayoutOption.Type.stretchWidth: stretchWidth = (int)i.value; break;
-                    case LayoutOption.Type.stretchHeight: stretchHeight = (int)i.value; break;
+                    case LayoutOption.Type.fixedWidth: minWidth = maxWidth = i.value; stretchWidth = 0; break;
+                    case LayoutOption.Type.fixedHeight: minHeight = maxHeight = i.value; stretchHeight = 0; break;
+                    case LayoutOption.Type.minWidth: minWidth = i.value; if (maxWidth < minWidth) maxWidth = minWidth; break;
+                    case LayoutOption.Type.maxWidth: maxWidth = i.value; if (minWidth > maxWidth) minWidth = maxWidth; stretchWidth = 0; break;
+                    case LayoutOption.Type.minHeight: minHeight = i.value; if (maxHeight < minHeight) maxHeight = minHeight; break;
+                    case LayoutOption.Type.maxHeight: maxHeight = i.value; if (minHeight > maxHeight) minHeight = maxHeight; stretchHeight = 0; break;
+                    case LayoutOption.Type.stretchWidth: stretchWidth = i.value; break;
+                    case LayoutOption.Type.stretchHeight: stretchHeight = i.value; break;
                 }
             }
 
@@ -1466,7 +1481,7 @@ public static partial class CoreGUI
 
 
     // Layout controller for content inside scroll views
-    internal sealed class ScrollGroup : LayoutGroup
+    public sealed class ScrollGroup : LayoutGroup
     {
         public float calcMinWidth, calcMaxWidth, calcMinHeight, calcMaxHeight;
         public float clientWidth, clientHeight;
@@ -1647,6 +1662,21 @@ public static partial class CoreGUI
                 rect.height = height;
                 clientHeight = availableHeight;
             }
+        }
+    }
+
+
+    public class LayoutFadeGroup : LayoutGroup
+    {
+        public float fadeValue;
+        public bool wasGUIEnabled;
+        public Color guiColor;
+
+        public override void CalcHeight()
+        {
+            base.CalcHeight();
+            minHeight *= fadeValue;
+            maxHeight *= fadeValue;
         }
     }
 }

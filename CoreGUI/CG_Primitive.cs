@@ -49,7 +49,7 @@ public static partial class CoreGUI
     {
         return NumberField(label, value, int.TryParse);
     }
-    
+
     public delegate bool TryParseFunc<T2>(string s, out T2 result);
 
     static string lastNumberStr;
@@ -81,19 +81,19 @@ public static partial class CoreGUI
             if (parser(v, out f))
                 return f;
             else if (v.Length == 0)
-                 return default(T);
+                return default(T);
         }
 
         return value;
     }
-    
+
     static public float HorizontalSlider(GUIContent label, float value, float min, float max)
     {
         var r = PrefixLabel(Reserve(), label);
         r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
         return GUI.HorizontalSlider(r, value, min, max);
     }
-    
+
     static public int HorizontalSlider(GUIContent label, int value, int min, int max)
     {
         var r = PrefixLabel(Reserve(), label);
@@ -106,57 +106,67 @@ public static partial class CoreGUI
         var r = PrefixLabel(Reserve(), label);
         return GUI.TextField(r, value);
     }
-    
+
     public static string PasswordField(GUIContent label, string value, char maskChar)
     {
         var r = PrefixLabel(Reserve(), label);
         return GUI.PasswordField(r, value ?? "", maskChar);
     }
-    
+
     public static string TextArea(GUIContent label, string value)
     {
         return TextArea(label, value, 0, int.MaxValue);
     }
-    
+
+    static Dictionary<int, Rect> s_textAreaLastRect = new Dictionary<int, Rect>();
+
     public static string TextArea(GUIContent label, string value, int minLines, int maxLines, bool scrollBar = true)
     {
-        BeginLayoutOption(Layout.ExpandWidth(true));
-        var r = PrefixLabel(Reserve(Vector2.zero), label);
-        EndLayoutOption();
-
-        var style = GUI.skin.textArea;
-        var s = style.CalcHeight(C(value), r.width);
-        if (minLines > 0 && maxLines < int.MaxValue)
+        using (Scoped.Horizontal(label))
         {
-            var sz = style.fontSize <= 0 ? 16 : style.fontSize;
-            var s2 = Mathf.Clamp(s, minLines * sz, maxLines * sz + style.padding.vertical);
-
-            if (s2 < s && scrollBar)
+            var style = GUI.skin.textField;
+            if (minLines == 0 && maxLines == int.MaxValue)
             {
-                Reserve(new Vector2(0, s2));
-                r.height = s2;
-                r.width -= 14;
-                    
-                var text = GUI.TextArea(r, value);
-                TextEditor editor = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
-
-                if (editor.position != r)
-                    return text; //Maybe we catch the wrong one?
-                
-                r.width += 14;
-                r.xMin = r.xMax - 14;
-                s = style.CalcHeight(C(value), r.width - 14f);
-
-                editor.scrollOffset.y = GUI.VerticalScrollbar(r, editor.scrollOffset.y, r.height, 0, s);
-                
-                return text;
+                // No need fancy scrollbar or special settings
+                return GUI.TextArea(Reserve(C(value), style), value);
             }
             else
-                s = s2;
+            {
+                var id = GUIUtility.GetControlID(FocusType.Passive);
+                var lastRect = s_textAreaLastRect.ContainsKey(id) ? s_textAreaLastRect[id] : new Rect(0, 0, Screen.width, Screen.height);
+
+                var sz = style.lineHeight;
+                var h = style.CalcHeight(C(value), lastRect.width);
+                var h2 = Mathf.Clamp(h, minLines * sz, maxLines == int.MaxValue ? maxLines : sz * maxLines);
+                var r = Reserve(new Vector2(0, h2));
+
+                if (ev.type != EventType.Layout && ev.type != EventType.Used)
+                    s_textAreaLastRect[id] = r;
+
+                if (h != h2 && scrollBar)
+                {
+                    r.width -= 14;
+
+                    var text = GUI.TextArea(r, value);
+
+                    TextEditor editor = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
+
+                    if (editor.position != r)
+                        return text; //Maybe we catch the wrong one?
+
+                    var s = style.CalcHeight(C(value), r.width);
+                    
+                    r.xMin = r.xMax;
+                    r.width = 14;
+
+                    editor.scrollOffset.y = GUI.VerticalScrollbar(r, editor.scrollOffset.y, r.height, 0, s);
+
+                    return text;
+                }
+
+                return GUI.TextArea(r, value);
+            }
         }
 
-        Reserve(new Vector2(0, s));
-        r.height = s;
-        return GUI.TextArea(r, value);
     }
 }

@@ -21,7 +21,6 @@ public static partial class CoreGUI
 
     static void PrefixLabelStart(GUIContent label)
     {
-        prefixLabels.Push(label);
         if (label != null)
         {
             LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, layoutOptions, typeof(LayoutGroup));
@@ -38,8 +37,24 @@ public static partial class CoreGUI
                 BeginLayoutOption(Layout.Height(0));
                 PrefixLabel(Reserve(), label);
                 EndLayoutOption();
-            }           
+            }
+            else if (ev.type == EventType.Repaint)
+            {
+                // in case it's copied from C, we need to copy it out from cache.
+                label = new GUIContent(label);
+            }
+
+            if ((guiIndentPolicy != IndentPolicy.None && guiIndentPolicy != IndentPolicy.Label && guiIndent > 0) &&
+                (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
+            {
+                LayoutUtility.BeginLayoutGroup(GUIStyle.none, layoutOptions, typeof(LayoutGroup)).isVertical = false;
+                BeginLayoutOption(Layout.Width(guiIndent * 16));
+                Reserve();
+                EndLayoutOption();
+            }
+
         }
+        prefixLabels.Push(label);
     }
 
     static void PrefixLabelEnd()
@@ -47,6 +62,11 @@ public static partial class CoreGUI
         var label = prefixLabels.Pop();
         if (label != null)
         {
+            if ((guiIndentPolicy != IndentPolicy.None && guiIndentPolicy != IndentPolicy.Label && guiIndent > 0) &&
+               (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
+            {
+                LayoutUtility.EndLayoutGroup();
+            }
             if (prefixLabelSide == Side.Right)
             {
                 BeginLayoutOption(Layout.Width(prefixLabelWidth));
@@ -60,7 +80,7 @@ public static partial class CoreGUI
                 EndLayoutOption();
             }
 
-            LayoutUtility.EndLayoutGroup();            
+            LayoutUtility.EndLayoutGroup();
         }
     }
 
@@ -75,8 +95,8 @@ public static partial class CoreGUI
             }
         }
 
-        float width = label != null || guiIndentPolicy == IndentPolicy.Full ? prefixLabelWidth :
-            (guiIndentPolicy == IndentPolicy.Widgets ? guiIndent * 16 : 0);
+        float offset = (guiIndentPolicy == IndentPolicy.Widgets || guiIndentPolicy == IndentPolicy.Full) ? guiIndent * 16 : 0;
+        float width = label != null || guiIndentPolicy == IndentPolicy.Full ? prefixLabelWidth : offset;
 
         switch (prefixLabelSide)
         {
@@ -88,10 +108,12 @@ public static partial class CoreGUI
                 break;
             case Side.Top:
                 Reserve(new Vector2(0, width));
+                totalPosition.xMin += offset;
                 totalPosition.y += width;
                 break;
             case Side.Bottom:
                 Reserve(new Vector2(0, width));
+                totalPosition.xMin += offset;
                 break;
         }
 
@@ -101,19 +123,22 @@ public static partial class CoreGUI
     private static Rect CalculatePrefixedRect(Rect totalPosition, GUIContent label)
     {
         var r = totalPosition;
+        var indent = guiIndentPolicy == IndentPolicy.None ? 0 : guiIndent * 16;
         switch (prefixLabelSide)
         {
             case Side.Left:
                 r.width = prefixLabelWidth;
-                r.xMin += guiIndentPolicy == IndentPolicy.None ? 0 : guiIndent * 16;
+                r.xMin += indent;
                 break;
             case Side.Right:
-                r.xMin += r.width - prefixLabelWidth - (guiIndentPolicy == IndentPolicy.None ? 0 : guiIndent * 16);
+                r.xMin += r.width - prefixLabelWidth;// - (guiIndentPolicy == IndentPolicy.None ? 0 : guiIndent * 16);
+                r.xMax -= indent;
                 break;
             case Side.Top:
+                r.xMin += indent;
                 break;
             case Side.Bottom:
-                r.y += r.height;
+                r.xMin += indent;
                 break;
         }
         r.height = GUI.skin.label.CalcHeight(label, r.width);
@@ -123,15 +148,13 @@ public static partial class CoreGUI
     public static Rect PrefixFoldout(Rect totalPosition, GUIContent label, ref bool expanded)
     {
         var r2 = CalculatePrefixedRect(totalPosition, label);
-        var r = PrefixLabel(totalPosition, label);
-        r2.x -= 16;
-        r2.width = 16;
-        expanded = GUI.Toggle(r2, expanded, GUIContent.none);
+        var r = PrefixLabel(totalPosition, GUIContent.none);
+        expanded = GUI.Toggle(r2, expanded, label);
 
         return r;
     }
 
-    static Rect Indent(Rect r, bool ignorePolicy = false)
+    public static Rect Indent(Rect r, bool ignorePolicy = false)
     {
         if (guiIndentPolicy == IndentPolicy.Widgets || ignorePolicy)
             r.xMin += guiIndent * 16;
@@ -144,6 +167,11 @@ public static partial class CoreGUI
     public static Rect Reserve(GUIContent content = null, GUIStyle style = null)
     {
         return LayoutUtility.GetRect(content ?? GUIContent.none, style ?? GUI.skin.label, layoutOptions);
+    }
+
+    public static Rect Reserve(float aspect)
+    {
+        return LayoutUtility.GetAspectRect(aspect);
     }
 
     public static Rect Reserve(Vector2 size)
@@ -190,11 +218,16 @@ public static partial class CoreGUI
 
     public static Rect BeginHorizontal(GUIContent label = null)
     {
+        return BeginHorizontal(label, Utility.emptyLayoutOption);
+    }
+
+    public static Rect BeginHorizontal(GUIContent label, params LayoutOption[] options)
+    {
         PrefixLabelStart(label);
         if (label != null)
             BeginIndent(IndentPolicy.None);
         {
-            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, layoutOptions, typeof(LayoutGroup));
+            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(LayoutGroup));
             g.isVertical = false;
             return g.rect;
         }
@@ -210,11 +243,16 @@ public static partial class CoreGUI
 
     public static Rect BeginVertical(GUIContent label = null)
     {
+        return BeginVertical(label, Utility.emptyLayoutOption);
+    }
+
+    public static Rect BeginVertical(GUIContent label = null, params LayoutOption[] options)
+    {
         PrefixLabelStart(label);
         if (label != null)
             BeginIndent(IndentPolicy.None);
         {
-            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, layoutOptions, typeof(LayoutGroup));
+            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(LayoutGroup));
             g.isVertical = true;
             return g.rect;
         }
@@ -230,12 +268,22 @@ public static partial class CoreGUI
 
     public static void BeginScrollView(ref Vector2 scroll, bool alwaysShowHorizontal = false, bool alwaysShowVertical = false)
     {
-        scroll = BeginScrollView(scroll, alwaysShowHorizontal, alwaysShowVertical);
+        scroll = BeginScrollView(scroll, alwaysShowHorizontal, alwaysShowVertical, Utility.emptyLayoutOption);
+    }
+
+    public static void BeginScrollView(ref Vector2 scroll, bool alwaysShowHorizontal = false, bool alwaysShowVertical = false, params LayoutOption[] options)
+    {
+        scroll = BeginScrollView(scroll, alwaysShowHorizontal, alwaysShowVertical, options);
     }
 
     public static Vector2 BeginScrollView(Vector2 scroll, bool alwaysShowHorizontal = false, bool alwaysShowVertical = false)
     {
-        ScrollGroup g = (ScrollGroup)LayoutUtility.BeginLayoutGroup(GUIStyle.none, null, typeof(ScrollGroup));
+        return BeginScrollView(scroll, alwaysShowHorizontal, alwaysShowVertical, Utility.emptyLayoutOption);
+    }
+
+    public static Vector2 BeginScrollView(Vector2 scroll, bool alwaysShowHorizontal, bool alwaysShowVertical, params LayoutOption[] options)
+    {
+        ScrollGroup g = (ScrollGroup)LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(ScrollGroup));
         switch (Event.current.type)
         {
             case EventType.Layout:
@@ -254,20 +302,32 @@ public static partial class CoreGUI
         }
         return GUI.BeginScrollView(g.rect, scroll, new Rect(0, 0, g.clientWidth, g.clientHeight), alwaysShowHorizontal, alwaysShowVertical);
     }
-    
+
     public static void EndScrollView()
     {
         LayoutUtility.EndLayoutGroup();
         GUI.EndScrollView();
     }
 
+
+    public static void BeginGUI(int id)
+    {
+        BeginGUI(id, new Rect(0, 0, Screen.width, Screen.height));
+    }
+
     public static void BeginGUI(UnityEngine.Object obj)
     {
-        BeginGUI(obj.GetInstanceID(), new Rect(0, 0, Screen.width, Screen.height));
+        BeginGUI(obj.GetInstanceID());
+    }
+    
+    public static void BeginGUI(UnityEngine.Object obj, Rect position)
+    {
+        BeginGUI(obj.GetInstanceID(), position);
     }
 
     public static void BeginGUI(int id, Rect position)
     {
+        GUI.Box(position, GUIContent.none);
         LayoutUtility.Begin(id);
         BeginArea(position);
     }
@@ -311,6 +371,13 @@ public static partial class CoreGUI
         }
 
         GUI.BeginGroup(g.rect, GUIContent.none, GUIStyle.none);
+    }
+
+    public static void BeginArea(Rect screenRect, GUIStyle style)
+    {
+        if (style != null)
+            GUI.Box(screenRect, GUIContent.none, style);
+        BeginArea(screenRect);
     }
 
     public static void EndArea()
@@ -369,22 +436,72 @@ public static partial class CoreGUI
         }
         else
         {
-            fade += (val ? 1 : -1) * Time.unscaledDeltaTime;
-            fade = Mathf.Clamp(fade, 0, 1);
-            _fadeTimes[id] = fade;
-            BeginFadeGroup(fade);
+            if (ev.type == EventType.Layout)
+            {
+                fade += (val ? 1 : -1) * Time.unscaledDeltaTime * 2;
+                fade = Mathf.Clamp(fade, 0, 1);
+                _fadeTimes[id] = fade;
+            }
+            if (val)
+            {
+                var f = 1 - fade;
+                BeginFadeGroup(1 - f * f * f * f);
+            }
+            else
+                BeginFadeGroup(fade * fade * fade * fade);
+
             return fade > 0;
         }
     }
 
-    public static bool BeginFadeGroup(float fade)
+    public static bool BeginFadeGroup(float value)
     {
-        return fade > 0;
+        // Fade groups interfere with layout even when the fade group is collapsed because
+        // the margins of the elements before and after are added together instead of overlapping.
+        // This creates unwanted extra space between controls if there's an inactive fade group in between.
+        // We avoid this by simply not having the fade group if it's collapsed.
+        if (value == 0)
+        {
+            return false;
+        }
+        // Active fade groups interfere with styles that have overflow, because the overflow part gets clipped.
+        // We avoid this by simply not having the fade group if it's fully expanded.
+        if (value == 1)
+        {
+            return true;
+        }
+
+        LayoutFadeGroup g = (LayoutFadeGroup)LayoutUtility.BeginLayoutGroup(GUIStyle.none, null, typeof(LayoutFadeGroup));
+        g.isVertical = true;
+        g.resetCoords = true;
+        g.fadeValue = value;
+        g.wasGUIEnabled = GUI.enabled;
+        g.guiColor = GUI.color;
+        if (value != 0.0f && value != 1.0f && Event.current.type == EventType.MouseDown)
+        {
+            Event.current.Use();
+        }
+
+        // We don't want the fade group gui clip to be used for calculating the label width of controls in this fade group, so we lock the context width.
+        //EditorGUIUtility.LockContextWidth();
+        GUI.BeginGroup(g.rect);
+
+        return value != 0;
     }
 
     public static void EndFadeGroup()
     {
-
+        // If we're inside a fade group, end it here.
+        // See BeginFadeGroup for details on why it's not always present.
+        LayoutFadeGroup g = LayoutUtility.topLevel as LayoutFadeGroup;
+        if (g != null)
+        {
+            GUI.EndGroup();
+            //EditorGUIUtility.UnlockContextWidth();
+            GUI.enabled = g.wasGUIEnabled;
+            GUI.color = g.guiColor;
+            LayoutUtility.EndLayoutGroup();
+        }
     }
 
     static Stack<ValueTuple<int, IndentPolicy>> guiIndentPolicies = new Stack<ValueTuple<int, IndentPolicy>>();

@@ -5,6 +5,14 @@ using UnityEngine;
 public static partial class CoreGUI
 {
 
+    public static void Space(float pixels)
+    {
+        if (LayoutUtility.current.topLevel.isVertical)
+            LayoutUtility.GetRect(0, pixels, LayoutUtility.spaceStyle, Layout.Height(pixels));
+        else
+            LayoutUtility.GetRect(pixels, 0, LayoutUtility.spaceStyle, Layout.Width(pixels));
+    }
+
     public static bool Button(GUIContent label)
     {
         return GUI.Button(Indent(Reserve(label, GUI.skin.button)), label);

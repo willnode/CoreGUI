@@ -20,12 +20,11 @@ public static partial class CoreGUI
             foreach (var item in popups)
             {
                 var v = style.CalcSize(item.content);
-                g.y += v.y + style.margin.vertical;
+                g.y += v.y + style.margin.top;
                 g.x = Mathf.Max(g.x, v.x);
             }
 
             g.x += style.margin.horizontal;
-            g.y += style.margin.top;
 
             return g;
         }
@@ -55,26 +54,27 @@ public static partial class CoreGUI
                 shown = false;
                 return null;
             }
-
-            GUILayout.BeginArea(position, GUI.skin.box);
-            BeginIndent(IndentPolicy.None);
-            for (int i = 0; i < popups.Count; i++)
+            
+            BeginArea(position, GUI.skin.box);
+            using (Scoped.Indent(IndentPolicy.None))
             {
-                if (popups[i] == null) continue;
-                if (Button(popups[i].content))
+                for (int i = 0; i < popups.Count; i++)
                 {
-                    shown = false;
-                    obj = popups[i].value;
+                    if (popups[i] == null) continue;
+                    if (Button(popups[i].content))
+                    {
+                        shown = false;
+                        obj = popups[i].value;
+                    }
                 }
             }
-            EndIndent();
             EndArea();
             return obj;
         }
 
         public void Show()
         {
-            Show(new Rect(Event.current.mousePosition, Vector2.zero));
+            Show(new Rect((Event.current.mousePosition), Vector2.zero));
         }
 
         public void Show(Rect position)
@@ -82,7 +82,13 @@ public static partial class CoreGUI
             shown = isJustShown = true;
             position.y += position.height;
             position.size = Vector2.Max(position.size, GetSize());
-            position.position = Vector2.Min(position.position, new Vector2(Screen.width, Screen.height) - position.size);
+            var top = LayoutUtility.topLevel;
+            if (top is ScrollGroup)
+            {
+                var tops = (ScrollGroup)top;
+                position.position = Vector2.Min(position.position, new Vector2(tops.clientWidth, tops.clientHeight) + tops.rect.position - position.size);
+            } else
+               position.position = Vector2.Min(position.position, LayoutUtility.topLevel.rect.max - position.size);
             this.position = position;
         }
     }
