@@ -1,4 +1,8 @@
-﻿using System;
+﻿#if !(UNITY_2017 || UNITY_5 || UNITY_4)
+#define INT_STRUCTS
+#endif
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,31 +13,35 @@ public static partial class CoreGUI
 
     public static Color ColorField(GUIContent label, Color color, bool alpha = true)
     {
-        BeginHorizontal(label);
-        var r = Reserve();
-
-        if (ev.type == EventType.Repaint)
+        using (Scoped.Horizontal(label))
         {
-            var oldC = GUI.color;
-            GUI.color = new Color(color.r, color.g, color.b);
-            if (alpha)
-               r.height -= 4f;
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            if (alpha)
+            var r = Reserve();
+#if UNITY_EDITOR
+            if (Utility.IsOnEditorWindow())
+                return UnityEditor.EditorGUI.ColorField(r, GUIContent.none, color, true, alpha, false);
+#endif
+            if (ev.type == EventType.Repaint)
             {
-                r.y += r.height;
-                r.height = 4f;
-                GUI.color = Color.black;
+                var oldC = GUI.color;
+                GUI.color = new Color(color.r, color.g, color.b);
+                if (alpha)
+                    r.height -= 4f;
                 GUI.DrawTexture(r, Texture2D.whiteTexture);
-                r.width *= color.a;
-                GUI.color = Color.white;
-                GUI.DrawTexture(r, Texture2D.whiteTexture);
+                if (alpha)
+                {
+                    r.y += r.height;
+                    r.height = 4f;
+                    GUI.color = Color.black;
+                    GUI.DrawTexture(r, Texture2D.whiteTexture);
+                    r.width *= color.a;
+                    GUI.color = Color.white;
+                    GUI.DrawTexture(r, Texture2D.whiteTexture);
+                }
+                GUI.color = oldC;
             }
-            GUI.color = oldC;
-        }
 
-        EndHorizontal();
-        return color;
+            return color;
+        }
     }
 
     public static Rect RectField(GUIContent label, Rect rect)
@@ -56,7 +64,7 @@ public static partial class CoreGUI
         EndHorizontal();
         return rect;
     }
-    
+
     public static Quaternion QuaternionField(GUIContent label, Quaternion quaternion, bool euler = true)
     {
         return new Quaternion();
@@ -78,7 +86,7 @@ public static partial class CoreGUI
     public static Vector2 VectorField(GUIContent label, Vector2 vector)
     {
         BeginHorizontal(label);
-        BeginLabelOption(16, Side.Left);      
+        BeginLabelOption(16, Side.Left);
         {
             vector.x = FloatField(C("X"), vector.x);
             vector.y = FloatField(C("Y"), vector.y);
@@ -117,7 +125,38 @@ public static partial class CoreGUI
         return vector;
     }
 
-#if !(UNITY_2017 || UNITY_5 || UNITY_4)
+    public static RectOffset RectOffsetField(GUIContent label, RectOffset rect)
+    {
+        bool flag = rect == null;
+        if (flag) rect = new RectOffset();
+
+        BeginChangeCheck();
+        BeginHorizontal(label);
+        BeginLabelOption(16, Side.Left);
+        BeginVertical();
+        {
+            rect.left = IntField(C("L"), rect.left);
+            rect.right = IntField(C("R"), rect.right);
+        }
+        EndVertical();
+        BeginVertical();
+        {
+            rect.top = IntField(C("T"), rect.top);
+            rect.bottom = IntField(C("B"), rect.bottom);
+        }
+        EndVertical();
+        EndLabelOption();
+        EndHorizontal();
+
+        if (EndChangeCheck())
+            return rect;
+        else if (flag)
+            return null;
+        else
+            return rect;
+    }
+
+#if INT_STRUCTS
 
     public static BoundsInt BoundsField(GUIContent label, BoundsInt bounds)
     {

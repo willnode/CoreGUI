@@ -149,7 +149,7 @@ public static partial class CoreGUI
     {
         var r2 = CalculatePrefixedRect(totalPosition, label);
         var r = PrefixLabel(totalPosition, GUIContent.none);
-        expanded = GUI.Toggle(r2, expanded, label);
+        expanded = GUI.Toggle(r2, expanded, label, Styles.Foldout);
 
         return r;
     }
@@ -166,21 +166,29 @@ public static partial class CoreGUI
 
     public static Rect Reserve(GUIContent content = null, GUIStyle style = null)
     {
+        if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
+
         return LayoutUtility.GetRect(content ?? GUIContent.none, style ?? GUI.skin.label, layoutOptions);
     }
 
     public static Rect Reserve(float aspect)
     {
+        if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
+
         return LayoutUtility.GetAspectRect(aspect);
     }
 
     public static Rect Reserve(Vector2 size)
     {
+        if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
+
         return LayoutUtility.GetRect(size.x, size.y, layoutOptions);
     }
 
     public static Rect Reserve(Rect minMax)
     {
+        if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
+
         return LayoutUtility.GetRect(minMax.xMin, minMax.xMax, minMax.yMin, minMax.yMax, layoutOptions);
     }
 
@@ -223,6 +231,8 @@ public static partial class CoreGUI
 
     public static Rect BeginHorizontal(GUIContent label, params LayoutOption[] options)
     {
+        if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
+
         PrefixLabelStart(label);
         if (label != null)
             BeginIndent(IndentPolicy.None);
@@ -235,6 +245,8 @@ public static partial class CoreGUI
 
     public static void EndHorizontal()
     {
+        if (Utility.currentCustomEvent != null) return;
+
         LayoutUtility.EndLayoutGroup();
         if (prefixLabels.Peek() != null)
             EndIndent();
@@ -248,6 +260,8 @@ public static partial class CoreGUI
 
     public static Rect BeginVertical(GUIContent label = null, params LayoutOption[] options)
     {
+        if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
+
         PrefixLabelStart(label);
         if (label != null)
             BeginIndent(IndentPolicy.None);
@@ -260,6 +274,8 @@ public static partial class CoreGUI
 
     public static void EndVertical()
     {
+        if (Utility.currentCustomEvent != null) return;
+
         LayoutUtility.EndLayoutGroup();
         if (prefixLabels.Peek() != null)
             EndIndent();
@@ -283,6 +299,8 @@ public static partial class CoreGUI
 
     public static Vector2 BeginScrollView(Vector2 scroll, bool alwaysShowHorizontal, bool alwaysShowVertical, params LayoutOption[] options)
     {
+        if (Utility.currentCustomEvent != null) return scroll;
+
         ScrollGroup g = (ScrollGroup)LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(ScrollGroup));
         switch (Event.current.type)
         {
@@ -305,6 +323,8 @@ public static partial class CoreGUI
 
     public static void EndScrollView()
     {
+        if (Utility.currentCustomEvent != null) return;
+
         LayoutUtility.EndLayoutGroup();
         GUI.EndScrollView();
     }
@@ -317,24 +337,64 @@ public static partial class CoreGUI
 
     public static void BeginGUI(UnityEngine.Object obj)
     {
-        BeginGUI(obj.GetInstanceID());
-    }
-    
-    public static void BeginGUI(UnityEngine.Object obj, Rect position)
-    {
-        BeginGUI(obj.GetInstanceID(), position);
+        BeginGUI(obj, new Rect(0, 0, Screen.width, Screen.height));
     }
 
-    public static void BeginGUI(int id, Rect position)
+    public static void BeginGUI(UnityEngine.Object obj, Rect position)
     {
+        BeginGUI(obj.GetInstanceID(), position
+#if UNITY_EDITOR
+            , obj is UnityEditor.EditorWindow || obj is UnityEditor.Editor
+#endif
+            );
+    }
+
+    public static void BeginGUI(int id, Rect position, bool isEditorWindow = false)
+    {
+        
+        if (Utility.currentCustomEvents.ContainsKey(id))
+        {
+            if (ev.type != EventType.Layout)
+            {
+                GUIUtility.ExitGUI();
+            }
+            else
+            {
+                Utility.currentCustomEvents.Remove(id);
+            }
+        }
+
+        if (ev.type == EventType.Layout)
+        {
+            Queue<Event> pends;
+            if (Utility.pendingEvents.TryGetValue(id, out pends) && pends.Count > 0)
+            {
+                // Lets hijack this event
+                Event.current = Utility.currentCustomEvent = Utility.currentCustomEvents[id] = pends.Dequeue();
+            }           
+        }
+
         GUI.Box(position, GUIContent.none);
-        LayoutUtility.Begin(id);
+        LayoutUtility.Begin(Utility.currentGUIID = id);
         BeginArea(position);
+        Utility._isEditorWindow = isEditorWindow;
     }
 
     public static void EndGUI()
     {
         EndArea();
+
+        if (Popup.shownPopup != null)
+        {
+            Popup.shownPopup.OnGUI();
+        }
+
+        if (Utility.delayCall != null)
+        {
+            Utility.delayCall();
+            Utility.delayCall = null;
+        }
+
         if (guiIndentPolicies.Count > 0)
         {
             Debug.LogError("WARNING: You're pushing more indent stacks than popping it");
@@ -356,11 +416,15 @@ public static partial class CoreGUI
         if (ev.type == EventType.Layout)
             LayoutUtility.Layout();
 
+        if (Utility.currentCustomEvent != null)
+            Event.current = Utility.currentCustomEvent = null; // Reset to master event
     }
 
 
     public static void BeginArea(Rect screenRect)
     {
+        if (Utility.currentCustomEvent != null) return;
+
         LayoutGroup g = LayoutUtility.BeginLayoutArea(GUIStyle.none, typeof(LayoutGroup));
         if (Event.current.type == EventType.Layout)
         {
@@ -382,8 +446,8 @@ public static partial class CoreGUI
 
     public static void EndArea()
     {
-        if (Event.current.type == EventType.Used)
-            return;
+        if (Utility.currentCustomEvent != null) return;
+
         LayoutUtility.current.layoutGroups.Pop();
         LayoutUtility.current.topLevel = (LayoutGroup)LayoutUtility.current.layoutGroups.Peek();
         GUI.EndGroup();
@@ -438,7 +502,8 @@ public static partial class CoreGUI
         {
             if (ev.type == EventType.Layout)
             {
-                fade += (val ? 1 : -1) * Time.unscaledDeltaTime * 2;
+                // Standard duration for animated foldout is 0.4 seconds
+                fade += (val ? 1 : -1) * Time.unscaledDeltaTime * 2.5f;
                 fade = Mathf.Clamp(fade, 0, 1);
                 _fadeTimes[id] = fade;
             }
@@ -456,6 +521,8 @@ public static partial class CoreGUI
 
     public static bool BeginFadeGroup(float value)
     {
+        if (Utility.currentCustomEvent != null) return value > 0;
+
         // Fade groups interfere with layout even when the fade group is collapsed because
         // the margins of the elements before and after are added together instead of overlapping.
         // This creates unwanted extra space between controls if there's an inactive fade group in between.
@@ -491,6 +558,8 @@ public static partial class CoreGUI
 
     public static void EndFadeGroup()
     {
+        if (Utility.currentCustomEvent != null) return;
+
         // If we're inside a fade group, end it here.
         // See BeginFadeGroup for details on why it's not always present.
         LayoutFadeGroup g = LayoutUtility.topLevel as LayoutFadeGroup;
@@ -502,6 +571,22 @@ public static partial class CoreGUI
             GUI.color = g.guiColor;
             LayoutUtility.EndLayoutGroup();
         }
+    }
+
+    static Stack<bool> enabledStacks = new Stack<bool>();
+
+    public static void BeginDisabledGroup(bool disabled, bool forced = false)
+    {
+        enabledStacks.Push(GUI.enabled);
+        if (forced)
+            GUI.enabled = !disabled;
+        else
+            GUI.enabled &= !disabled;
+    }
+
+    public static void EndDisabledGroup()
+    {
+        GUI.enabled = enabledStacks.Pop();
     }
 
     static Stack<ValueTuple<int, IndentPolicy>> guiIndentPolicies = new Stack<ValueTuple<int, IndentPolicy>>();

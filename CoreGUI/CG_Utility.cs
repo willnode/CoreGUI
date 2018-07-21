@@ -89,12 +89,17 @@ public static partial class CoreGUI
             return new DisposableScope(EndLayoutOption);
         }
 
+        public static DisposableScope DisabledGroup(bool disabled, bool forced = false)
+        {
+            BeginDisabledGroup(disabled, forced);
+            return new DisposableScope(EndDisabledGroup);
+        }
     }
 
     public struct DisposableScope : IDisposable
     {
         public readonly Action dispose;
-        
+
         public DisposableScope(Action dispose)
         {
             this.dispose = dispose;
@@ -108,6 +113,11 @@ public static partial class CoreGUI
 
     public static class Utility
     {
+
+        /// <summary>
+        /// Delegate to be called once before EndGUI()
+        /// </summary>
+        public static Action delayCall;
 
         static Dictionary<int, Rect> _safeRects = new Dictionary<int, Rect>();
 
@@ -128,19 +138,52 @@ public static partial class CoreGUI
                     _safeRects[id] = r;
 #if UNITY_EDITOR
                     // Because EditorWindow don't get repainted every frame...
-                    InternalRepaintEditorWindow();
+                    if (IsOnEditorWindow())
+                        InternalRepaintEditorWindow();
 #endif
                 }
                 return r;
             }
         }
 
+        internal static bool _isEditorWindow = false;
+
+        internal static int currentGUIID = -1;
+
+        internal static Dictionary<int, Queue<Event>> pendingEvents = new Dictionary<int, Queue<Event>>();
+
+        internal static Event currentCustomEvent = null;
+
+        internal static Dictionary<int, Event> currentCustomEvents = new Dictionary<int, Event>();
+
+        public static bool IsOnEditorWindow()
+        {
+            return _isEditorWindow;
+        }
+
+        public static void SendEvent(Event customEvent)
+        {
+#if UNITY_EDITOR
+            if (IsOnEditorWindow())
+                // This can be wrong, though.
+                UnityEditor.EditorWindow.focusedWindow.SendEvent(customEvent);
+            else
+#endif
+            {
+                Queue<Event> ev;
+                if (!pendingEvents.TryGetValue(currentGUIID, out ev))
+                    pendingEvents[currentGUIID] = ev = new Queue<Event>();
+
+                ev.Enqueue(customEvent);
+            }
+        }
+
         public static float pixelsPerPoint { get { return _pixelsPerPoint(); } }
 
-        public static Func<float> _pixelsPerPoint;
+        static Func<float> _pixelsPerPoint;
 
-        public static Action InternalRepaintEditorWindow;
-
+        public static readonly Action InternalRepaintEditorWindow;
+        
         static Func<GUIStyle, GUIContent, Vector2, Vector2> calcSizeWithConstraints;
 
         static Utility()

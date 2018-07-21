@@ -8,14 +8,16 @@ public static partial class CoreGUI
 {
     public class Popup
     {
-        public readonly int id = Time.time.GetHashCode();
+        public static Popup shownPopup;
+
+        public Action<object> action;
 
         public List<PopupItem> popups = new List<PopupItem>();
 
-        public Vector2 GetSize()
+        static Vector2 GetSize(List<PopupItem> popups)
         {
             var g = Vector2.zero;
-            var style = GUI.skin.button;
+            var style = Styles.MiniButton;
 
             foreach (var item in popups)
             {
@@ -25,79 +27,126 @@ public static partial class CoreGUI
             }
 
             g.x += style.margin.horizontal;
-
             return g;
         }
-
-        public bool shown { get; private set; }
 
         bool isJustShown = true;
 
         public Rect position;
 
-        public object OnGUI()
+        public void OnGUI()
         {
-            if (!shown)
-                return null;
-
-            object obj = null;
-
             var id = GUIUtility.GetControlID(FocusType.Keyboard);
 
-            if (isJustShown && id >= 0)
+            if (isJustShown)
             {
                 GUIUtility.keyboardControl = id;
                 isJustShown = false;
             }
-            else if (id >= 0 && GUIUtility.keyboardControl != id)
+            else if (GUIUtility.keyboardControl != id)
             {
-                shown = false;
-                return null;
+                shownPopup = null;
+                return;
             }
-            
+
             BeginArea(position, GUI.skin.box);
             using (Scoped.Indent(IndentPolicy.None))
             {
                 for (int i = 0; i < popups.Count; i++)
                 {
-                    if (popups[i] == null) continue;
-                    if (Button(popups[i].content))
+                    if (Button(popups[i].content, Styles.MiniButton))
                     {
-                        shown = false;
-                        obj = popups[i].value;
+                        action(popups[i].value);
+                        shownPopup = null;
                     }
                 }
             }
             EndArea();
-            return obj;
         }
 
-        public void Show()
+        public static void Show(List<PopupItem> items, int id)
         {
-            Show(new Rect((Event.current.mousePosition), Vector2.zero));
+            Show(items, MakeCallback(id));
         }
 
-        public void Show(Rect position)
+        public static void Show(List<PopupItem> items, Action<object> action)
         {
-            shown = isJustShown = true;
-            position.y += position.height;
-            position.size = Vector2.Max(position.size, GetSize());
-            var top = LayoutUtility.topLevel;
-            if (top is ScrollGroup)
+            Utility.delayCall += delegate
             {
-                var tops = (ScrollGroup)top;
-                position.position = Vector2.Min(position.position, new Vector2(tops.clientWidth, tops.clientHeight) + tops.rect.position - position.size);
-            } else
-               position.position = Vector2.Min(position.position, LayoutUtility.topLevel.rect.max - position.size);
-            this.position = position;
+                Show(new Rect((Event.current.mousePosition), Vector2.zero), items, action);
+            };
+        }
+
+        public static void Show(Rect position, List<PopupItem> items, Action<object> action)
+        {
+#if UNITY_EDITOR
+            if (Utility.IsOnEditorWindow())
+            {
+                // Fallback because this built-in popup is literally broken in editor mode (known issue)
+                UnityEditor.EditorUtility.DisplayCustomMenu(position, items.Select(x => x.content).ToArray(), -1,
+                    (userData, options, selected) => action(items[selected].value),
+                    null);
+                return;
+            }
+#endif
+            position.y += position.height; // If position == widget rect, show under it.
+            position.size = Vector2.Max(position.size, GetSize(items));
+            position.position = Vector2.Min(position.position, new Vector2(Screen.width, Screen.height) - position.size);
+            shownPopup = new Popup()
+            {
+                position = position,
+                popups = items,
+                action = action,
+            };
+        }
+
+        // ---
+
+        public static Dictionary<int, object> _pendingObjects = new Dictionary<int, object>();
+
+        public static Action<object> MakeCallback(int id)
+        {
+            return delegate (object o)
+            {
+                _pendingObjects[id] = o;
+                Event e;
+#if UNITY_EDITOR
+                if (Utility.IsOnEditorWindow())
+                {
+                    e = UnityEditor.EditorGUIUtility.CommandEvent("PopupSet");
+                }
+                else
+#endif
+                {
+                    e = new Event(ev);
+                    e.type = EventType.ExecuteCommand;
+                    e.commandName = "PopupSet";
+                }
+                Utility.SendEvent(e);
+            };
+        }
+
+        public static object GetValue(int id)
+        {
+            // Because Layout must be sync with other events...
+            if (ev.type == EventType.ExecuteCommand && ev.commandName == "PopupSet")
+            {
+                object o;
+                if (_pendingObjects.TryGetValue(id, out o))
+                {
+                    _pendingObjects.Remove(id);
+                    return o;
+                }
+            }
+            return null;
         }
     }
 
-    public class PopupItem
+    public struct PopupItem
     {
         public GUIContent content;
         public object value;
-        public bool enabled = true;
+        public bool disabled;
     }
 }
 
