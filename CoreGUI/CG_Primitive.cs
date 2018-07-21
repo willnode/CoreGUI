@@ -42,26 +42,38 @@ public static partial class CoreGUI
 
     public static float FloatField(GUIContent label, float value)
     {
-        return NumberField(label, value, float.TryParse);
+        return NumberField(label, value, float.TryParse, (v, d) => v == 0 ? d : v + d * 0.1f);
     }
 
     public static int IntField(GUIContent label, int value)
     {
-        return NumberField(label, value, int.TryParse);
+        return NumberField(label, value, int.TryParse, (v, d) => v + (int)d);
     }
 
     public delegate bool TryParseFunc<T2>(string s, out T2 result);
+    
 
     static string lastNumberStr;
     static int lastNumberID;
     static int lastNumberAnyID;
 
-    static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser)
+    static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser, Func<T, float, T> deltaProcessor = null)
     {
-        var r = PrefixLabel(Reserve(null, GUI.skin.textField), label);
         BeginChangeCheck();
 
         var id = GUIUtility.GetControlID(FocusType.Passive);
+
+        Rect r = Reserve(null, GUI.skin.textField);
+
+        if (deltaProcessor == null)
+            r = PrefixLabel(r, label, id + 1);
+        else
+        {
+            float delta;
+            r = PrefixSlider(r, label, id, out delta);
+            if (delta != 0)
+                value = deltaProcessor(value, delta);
+        }
 
         if (lastNumberAnyID != GUIUtility.keyboardControl)
         {
@@ -91,19 +103,33 @@ public static partial class CoreGUI
     {
         var r = PrefixLabel(Reserve(), label);
         r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
-        return GUI.HorizontalSlider(r, value, min, max);
+        var id = GUIUtility.GetControlID(FocusType.Keyboard);
+
+        if (GUIUtility.keyboardControl == id && ev.type == EventType.KeyDown)
+        {
+            if (ev.keyCode == KeyCode.LeftArrow || ev.keyCode == KeyCode.RightArrow)
+            {
+                var delta = Mathf.Pow(10, Mathf.Round(Mathf.Log10(Mathf.Abs(max - min))) - 2);
+                delta *= (ev.keyCode == KeyCode.LeftArrow ? -1f : 1f) * (ev.shift ? 10f : 1f);
+                value = Mathf.Clamp(value + delta, min, max);
+                GUI.changed = true;
+                Event.current.Use();
+            }
+        }
+
+        return GUI.Slider(r, value, 0, min, max, Styles.HorizontalSlider, Styles.HorizontalSliderThumb, true, id);
     }
 
     static public int HorizontalSlider(GUIContent label, int value, int min, int max)
     {
-        var r = PrefixLabel(Reserve(), label);
-        r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
-        return Mathf.RoundToInt(GUI.HorizontalSlider(r, value, min, max));
+        return Mathf.RoundToInt(HorizontalSlider(label, (float)value, min, max));
     }
 
     public static string TextField(GUIContent label, string value)
     {
-        var r = PrefixLabel(Reserve(), label);
+        var pos = Reserve();
+        var id = GUIUtility.GetControlID(FocusType.Passive, pos);
+        var r = PrefixLabel(pos, label, id + 1);
         return GUI.TextField(r, value);
     }
 

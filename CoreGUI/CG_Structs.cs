@@ -16,6 +16,7 @@ public static partial class CoreGUI
         using (Scoped.Horizontal(label))
         {
             var r = Reserve();
+            var id = GUIUtility.GetControlID(FocusType.Keyboard);
 #if UNITY_EDITOR
             if (Utility.IsOnEditorWindow())
                 return UnityEditor.EditorGUI.ColorField(r, GUIContent.none, color, true, alpha, false);
@@ -39,7 +40,16 @@ public static partial class CoreGUI
                 }
                 GUI.color = oldC;
             }
-
+            else if (ev.type == EventType.MouseDown && r.Contains(ev.mousePosition))
+            {
+                ColorDialogPopup.Show(id, color);
+            }
+            else if (ev.type == EventType.ExecuteCommand)
+            {
+                var c = PopupBase.GetValue(id);
+                if (c != null)
+                    return (Color)c;
+            }
             return color;
         }
     }

@@ -24,24 +24,17 @@ public static partial class CoreGUI
     {
         var i = Array.IndexOf(data.values, value);
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
-        var r = PrefixLabel(Reserve(), label);
-        switch (ev.type)
-        {
-            case EventType.MouseDown:
-                if (r.Contains(ev.mousePosition))
-                    data.ShowAsPopup(id);
-                break;
-            case EventType.Repaint:
-                Styles.Popup.Draw(r, data.contents[i], id);
-                break;
-            case EventType.Layout:
-            default:
-                var val = Popup.GetValue(id);
-                if (val != null)
-                    return val;
-                break;
-        }
-        return value;
+        var style = Styles.Popup;
+        var r = PrefixLabel(Reserve(label, style), label, id);
+
+        if(ButtonInternal(r, i < 0 ? GUIContent.none : data.contents[i], style, id))
+            data.ShowAsPopup(id);
+
+        var val = PopupBase.GetValue(id);
+        if (val != null)
+            return val;
+        else
+            return value;
     }
 
 
@@ -171,19 +164,19 @@ public static partial class CoreGUI
             this.names = contents.Select(x => x.text).ToArray();
         }
 
-        public List<PopupItem> popupCache;
+        public List<MenuPopupItem> popupCache;
 
         public void ShowAsPopup(int id)
         {
             if (popupCache == null)
             {
-                popupCache = new List<PopupItem>();
+                popupCache = new List<MenuPopupItem>();
                 for (int i = 0; i < values.Length; i++)
                 {
-                    popupCache.Add(new PopupItem() { content = contents[i], value = values[i] });
+                    popupCache.Add(new MenuPopupItem() { content = contents[i], value = values[i] });
                 }
             }
-            Popup.Show(popupCache, id);
+            MenuPopup.Show(id, popupCache);
         }
 
     }

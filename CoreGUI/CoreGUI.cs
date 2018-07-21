@@ -84,14 +84,22 @@ public static partial class CoreGUI
         }
     }
 
-    public static Rect PrefixLabel(Rect totalPosition, GUIContent label)
+    public static Rect PrefixLabel(Rect totalPosition, GUIContent label, int id = 0)
     {
         if (label != null && prefixLabelWidth > 0)
         {
-            if (Event.current.type == EventType.Repaint)
+            if (ev.type == EventType.Repaint || ev.type == EventType.MouseUp)
             {
                 Rect r = CalculatePrefixedRect(totalPosition, label);
-                GUI.Label(r, label);
+
+                if (ev.type == EventType.Repaint)
+                {
+                    DrawStyle(r, label, Styles.Prefix, id, false);
+                }
+                else if (r.Contains(ev.mousePosition) && id != 0)
+                {
+                    GUIUtility.keyboardControl = id;
+                }
             }
         }
 
@@ -107,12 +115,14 @@ public static partial class CoreGUI
                 totalPosition.xMax -= width;
                 break;
             case Side.Top:
-                Reserve(new Vector2(0, width));
+                if (width > 0)
+                    Reserve(new Vector2(0, width));
                 totalPosition.xMin += offset;
                 totalPosition.y += width;
                 break;
             case Side.Bottom:
-                Reserve(new Vector2(0, width));
+                if (width > 0)
+                    Reserve(new Vector2(0, width));
                 totalPosition.xMin += offset;
                 break;
         }
@@ -141,16 +151,34 @@ public static partial class CoreGUI
                 r.xMin += indent;
                 break;
         }
-        r.height = GUI.skin.label.CalcHeight(label, r.width);
+        r.height = GUI.skin.label.CalcHeight(label ?? GUIContent.none, r.width);
         return r;
     }
 
-    public static Rect PrefixFoldout(Rect totalPosition, GUIContent label, ref bool expanded)
+    public static Rect PrefixFoldout(Rect totalPosition, GUIContent label, ref bool expanded, int id = -1)
     {
         var r2 = CalculatePrefixedRect(totalPosition, label);
-        var r = PrefixLabel(totalPosition, GUIContent.none);
+        var r = PrefixLabel(totalPosition, GUIContent.none, id);
         expanded = GUI.Toggle(r2, expanded, label, Styles.Foldout);
 
+        return r;
+    }
+
+    public static Rect PrefixSlider(Rect totalPosition, GUIContent label, int id, out float delta)
+    {
+        if (id == 0) id = GUIUtility.GetControlID(FocusType.Passive);
+
+        delta = 0;
+
+        var r2 = CalculatePrefixedRect(totalPosition, label);
+        var r = PrefixLabel(totalPosition, label, id + 1);
+        if (ev.type == EventType.MouseDown && r2.Contains(ev.mousePosition))
+            GUIUtility.hotControl = id;
+        else if (ev.type == EventType.MouseDrag && GUIUtility.hotControl == id)
+            delta = ev.delta.x;
+        else if (ev.type == EventType.MouseUp && GUIUtility.hotControl == id)
+            GUIUtility.hotControl = 0;
+        
         return r;
     }
 
@@ -351,7 +379,7 @@ public static partial class CoreGUI
 
     public static void BeginGUI(int id, Rect position, bool isEditorWindow = false)
     {
-        
+        if (id == 0) throw new ArgumentException("id should never be zero");
         if (Utility.currentCustomEvents.ContainsKey(id))
         {
             if (ev.type != EventType.Layout)
@@ -384,9 +412,9 @@ public static partial class CoreGUI
     {
         EndArea();
 
-        if (Popup.shownPopup != null)
+        if (ev.type != EventType.Used && PopupBase.shownPopup.ContainsKey(Utility.currentGUIID))
         {
-            Popup.shownPopup.OnGUI();
+            PopupBase.shownPopup[Utility.currentGUIID].OnGUI();
         }
 
         if (Utility.delayCall != null)

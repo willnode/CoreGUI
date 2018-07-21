@@ -49,7 +49,7 @@ public static partial class CoreGUI
             m_Window = skin.window;
             m_ScrollView = skin.scrollView;
 
-            m_HorizontalSlider = skin.horizontalScrollbar;
+            m_HorizontalSlider = skin.horizontalSlider;
             m_HorizontalSliderThumb = skin.horizontalSliderThumb;
             m_VerticalSlider = skin.verticalSlider;
             m_VerticalSliderThumb = skin.verticalSliderThumb;

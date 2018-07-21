@@ -23,24 +23,79 @@ public static partial class CoreGUI
 
     public static bool Button(GUIContent content)
     {
-        return GUI.Button(Indent(Reserve(content, GUI.skin.button)), content);
+        return ButtonInternal(Indent(Reserve(content, GUI.skin.button)), content, Styles.Button);
     }
 
     public static bool Button(GUIContent content, GUIStyle style)
     {
-        return GUI.Button(Indent(Reserve(content, style)), content, style);
+        return ButtonInternal(Indent(Reserve(content, style)), content, style);
     }
 
     public static bool Button(GUIContent content, GUIContent prefix)
     {
-        var r = PrefixLabel(Reserve(content, GUI.skin.button), prefix);
-        return GUI.Button(r, content);
+        var id = GUIUtility.GetControlID(FocusType.Keyboard);
+        var r = PrefixLabel(Reserve(content, GUI.skin.button), prefix, id);
+        return ButtonInternal(r, content, Styles.Button, id);
     }
     
     public static bool Button(GUIContent content, GUIContent prefix, GUIStyle style)
     {
-        var r = PrefixLabel(Reserve(content, style), prefix);
-        return GUI.Button(r, content, style);
+        var id = GUIUtility.GetControlID(FocusType.Keyboard);
+        var r = PrefixLabel(Reserve(content, style), prefix, id);
+        return ButtonInternal(r, content, style, id);
+    }
+
+    static bool ButtonInternal(Rect r, GUIContent content, GUIStyle style, int id = 0)
+    {
+        if (id == 0)
+        {
+            id = GUIUtility.GetControlID(FocusType.Keyboard, r);
+        }
+        switch (ev.GetTypeForControl(id))
+        {
+            case EventType.MouseDown:
+               
+                if (r.Contains(ev.mousePosition) && ev.button == 0)
+                {
+                    GUIUtility.hotControl = id;
+                }
+                break;
+            case EventType.MouseUp:
+                if (GUIUtility.hotControl == id)
+                {
+                    GUIUtility.hotControl = 0;
+                    GUIUtility.keyboardControl = id;
+
+                    if (r.Contains(ev.mousePosition))
+                        return true;
+                }
+                break;
+            case EventType.KeyDown:
+                if (GUIUtility.keyboardControl == id && (ev.keyCode == KeyCode.Space))
+                {
+                    GUIUtility.hotControl = id;
+                }
+                break;
+            case EventType.KeyUp:
+                if (GUIUtility.hotControl == id && GUIUtility.keyboardControl == id)
+                {
+                    GUIUtility.hotControl = 0;
+                    return true;
+                }
+                break;
+            case EventType.Repaint:
+                DrawStyle(r, content, style, id);
+                break;
+        }
+        return false;
+    }
+
+    private static void DrawStyle(Rect r, GUIContent content, GUIStyle style, int id, bool on = false)
+    {
+        // Primary reason why not simply giveaway ControlID:
+        // The button is not appear to be clicked (active) when clicked via keyboard and mouse is not hovering them.
+        style.Draw(r, content ?? GUIContent.none, r.Contains(ev.mousePosition) || GUIUtility.hotControl == id,
+            GUIUtility.hotControl == id, on, GUIUtility.keyboardControl == id);
     }
 
     public static bool RepeatButton(GUIContent content)
@@ -61,19 +116,72 @@ public static partial class CoreGUI
 
     public static bool Toggle(GUIContent content, bool value)
     {
-        return GUI.Toggle(Indent(Reserve(content, GUI.skin.toggle)), value, content ?? GUIContent.none);
+        return ToggleInternal(Indent(Reserve(content, GUI.skin.toggle)), value, content, Styles.Toggle);
     }
 
     public static bool Toggle(GUIContent content, bool value, GUIStyle style)
     {
-        return GUI.Toggle(Indent(Reserve(content, style)), value, content ?? GUIContent.none, style);
+        return ToggleInternal(Indent(Reserve(content, style)), value, content, style);
     }
 
     public static bool Toggle(GUIContent content, bool value, GUIContent prefix)
     {
-        var r = PrefixLabel(Reserve(content, GUI.skin.toggle), prefix);
-        return GUI.Toggle(r, value, content ?? GUIContent.none);
+        var id = GUIUtility.GetControlID(FocusType.Keyboard);
+        var r = PrefixLabel(Reserve(content, GUI.skin.toggle), prefix, id);
+        return ToggleInternal(r, value, content, Styles.Toggle);
     }
+    
+    static bool ToggleInternal(Rect r, bool value, GUIContent content, GUIStyle style, int id = 0)
+    {
+        if (id == 0)
+        {
+            id = GUIUtility.GetControlID(FocusType.Keyboard, r);
+        }
+        switch (ev.GetTypeForControl(id))
+        {
+            case EventType.MouseDown:
+
+                if (r.Contains(ev.mousePosition) && ev.button == 0)
+                {
+                    GUIUtility.hotControl = id;
+                }
+                break;
+            case EventType.MouseUp:
+                if (GUIUtility.hotControl == id)
+                {
+                    GUIUtility.hotControl = 0;
+                    
+                    if (r.Contains(ev.mousePosition))
+                    {
+                        ev.Use();
+                        GUI.changed = true;
+                        GUIUtility.keyboardControl = id;
+                        return !value;
+                    }
+                }
+                break;
+            case EventType.KeyDown:
+                if (GUIUtility.keyboardControl == id && (ev.keyCode == KeyCode.Space))
+                {
+                    GUIUtility.hotControl = id;
+                }
+                break;
+            case EventType.KeyUp:
+                if (GUIUtility.hotControl == id && GUIUtility.keyboardControl == id)
+                {
+                    GUIUtility.hotControl = 0;
+                    GUI.changed = true;
+                    ev.Use();
+                    return !value;
+                }
+                break;
+            case EventType.Repaint:
+                DrawStyle(r, content, style, id, value);
+                break;
+        }
+        return value;
+    }
+
 
     public static bool Checkbox(GUIContent label, bool value)
     {
@@ -98,13 +206,12 @@ public static partial class CoreGUI
     
     public static bool Foldout(GUIContent label, bool expanded)
     {
-        PrefixFoldout(Reserve(label), label, ref expanded);
-        return expanded;
+        return ToggleInternal(Indent(Reserve(label, Styles.Foldout), true), expanded, label, Styles.Foldout);
     }
 
     public static bool Foldout(GUIContent label, ref bool expanded)
     {
-        PrefixFoldout(Reserve(label), label, ref expanded);
+        expanded = Foldout(label, expanded);
         return expanded;
     }
     

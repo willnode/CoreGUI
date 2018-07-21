@@ -161,8 +161,10 @@ public static partial class CoreGUI
             return _isEditorWindow;
         }
 
-        public static void SendEvent(Event customEvent)
+        public static void SendEvent(Event customEvent, int guiID = 0)
         {
+            if (guiID == 0)
+                guiID = currentGUIID;
 #if UNITY_EDITOR
             if (IsOnEditorWindow())
                 // This can be wrong, though.
@@ -171,8 +173,8 @@ public static partial class CoreGUI
 #endif
             {
                 Queue<Event> ev;
-                if (!pendingEvents.TryGetValue(currentGUIID, out ev))
-                    pendingEvents[currentGUIID] = ev = new Queue<Event>();
+                if (!pendingEvents.TryGetValue(guiID, out ev))
+                    pendingEvents[guiID] = ev = new Queue<Event>();
 
                 ev.Enqueue(customEvent);
             }
