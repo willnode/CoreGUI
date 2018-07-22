@@ -25,12 +25,13 @@ public static partial class CoreGUI
         var i = Array.IndexOf(data.values, value);
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
         var style = Styles.Popup;
-        var r = PrefixLabel(Reserve(label, style), label, id);
+        var content = i < 0 ? GUIContent.none : data.contents[i];
+        var r = PrefixLabel(content, style, label, id);
 
-        if(ButtonInternal(r, i < 0 ? GUIContent.none : data.contents[i], style, id))
+        if(ButtonInternal(r, content, style, id))
             data.ShowAsPopup(id);
 
-        var val = PopupBase.GetValue(id);
+        var val = PopupCallback.GetValue(id);
         if (val != null)
             return val;
         else

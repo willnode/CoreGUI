@@ -10,60 +10,58 @@ public static partial class CoreGUI
     {
         public static Dictionary<int, PopupBase> shownPopup = new Dictionary<int, PopupBase>();
 
-        public virtual bool IsDraggable { get { return false; } }
+        public virtual GUIContent PopupContent { get { return GUIContent.none; } }
 
-        public virtual GUIContent TitleContent { get { return GUIContent.none; } }
+        public virtual GUIStyle PopupStyle { get { return Styles.Window; } }
 
-        public virtual bool IsModal { get { return false; } }
+        public virtual bool IsPersistent { get { return false; } }
 
         public Action<object> action;
 
         public int callerGUIID;
-        
+
         public Rect position;
-        
+
         public abstract Vector2 GetSize();
 
-        bool isJustShown = true;
+        float callerScale = 1;
+
+        GUISkin callerSkin = null;
 
         public PopupBase(Action<object> action)
         {
             this.action = action;
             callerGUIID = Utility.currentGUIID;
+            callerScale = _currentScale;
+            callerSkin = GUI.skin;
         }
 
         public void OnGUI()
         {
             var id = GUIUtility.GetControlID(FocusType.Keyboard);
 
-            if (isJustShown)
-            {
-                GUI.FocusWindow(id);
-                GUI.BringWindowToFront(id);
-                isJustShown = false;
-            }
-
-            var pos = GUI.ModalWindow(id, position, (idd) =>
+            position = GUI.ModalWindow(id, position, (idd) =>
             {
                 var local = position;
                 local.position = Vector2.zero;
-                BeginGUI(idd, local);
+                local.size *= callerScale;
+
+                BeginGUI(idd, local, callerSkin, callerScale);
 
                 OnWindowGUI(idd);
 
-                EndGUI();
-
+                // Quit when mouse clicks outside window.
                 // Ugly workaround. But works.
-                if (ev.type == EventType.Ignore && !IsModal && !local.Contains(ev.mousePosition))
+                if (!IsPersistent && ((ev.type == EventType.Ignore && !local.Contains(ev.mousePosition))
+                || (ev.type == EventType.KeyUp && ev.keyCode == KeyCode.Escape)))
                 {
                     Close(); // Force close
                     ev.Use();
                 }
 
-            }, TitleContent);
+                EndGUI();
 
-            if (IsDraggable)
-                position = pos;
+            }, PopupContent, PopupStyle);
         }
 
         public abstract void OnWindowGUI(int id);
@@ -73,14 +71,23 @@ public static partial class CoreGUI
             shownPopup.Remove(callerGUIID);
         }
 
-        public void Apply(object item)
+        public void Apply(object item, bool autoClose = true)
         {
             action(item);
+            if (autoClose)
+                Close();
         }
 
         public static void Show(PopupBase popup)
         {
-            popup.isJustShown = true;
+            if (shownPopup.ContainsKey(popup.callerGUIID))
+            {
+                var k = shownPopup[popup.callerGUIID];
+                // Just in case
+                k.callerGUIID = popup.callerGUIID;
+                k.Close();
+            }
+
             shownPopup.Add(popup.callerGUIID, popup);
         }
 
@@ -91,51 +98,6 @@ public static partial class CoreGUI
             position.size = Vector2.Max(position.size, GetSize());
             position.position = Vector2.Max(Vector2.zero, Vector2.Min(position.position, new Vector2(Screen.width, Screen.height) - position.size));
         }
-
-
-
-        // ---
-
-        public static Dictionary<int, object> _pendingObjects = new Dictionary<int, object>();
-
-        public static Action<object> MakeCallback(int id)
-        {
-            var iid = Utility.currentGUIID;
-            return delegate (object o)
-            {
-                _pendingObjects[id] = o;
-                Event e;
-#if UNITY_EDITOR
-                if (Utility.IsOnEditorWindow())
-                {
-                    e = UnityEditor.EditorGUIUtility.CommandEvent("PopupSet");
-                }
-                else
-#endif
-                {
-                    e = new Event(ev);
-                    e.type = EventType.ExecuteCommand;
-                    e.commandName = "PopupSet";
-                }
-                Utility.SendEvent(e, iid);
-            };
-        }
-
-        public static object GetValue(int id)
-        {
-            // Because Layout must be sync with other events...
-            if (ev.type == EventType.ExecuteCommand && ev.commandName == "PopupSet")
-            {
-                object o;
-                if (_pendingObjects.TryGetValue(id, out o))
-                {
-                    _pendingObjects.Remove(id);
-                    return o;
-                }
-            }
-            return null;
-        }
-
     }
 
     public class MenuPopup : PopupBase
@@ -172,7 +134,7 @@ public static partial class CoreGUI
 
         public static void Show(int id, List<MenuPopupItem> items)
         {
-            Show(MakeCallback(id), items);
+            Show(PopupCallback.MakeCallback(id), items);
         }
 
         public static void Show(Action<object> action, List<MenuPopupItem> items)
@@ -186,9 +148,9 @@ public static partial class CoreGUI
         public static void Show(Rect position, Action<object> action, List<MenuPopupItem> items)
         {
 #if UNITY_EDITOR
-            if (Utility.IsOnEditorWindow())
+            if (Utility.isEditorWindow)
             {
-                // Fallback because this built-in popup is literally broken in editor mode (known issue?)
+                // Fallback because this built-in popup is literally worse in editor mode
                 UnityEditor.EditorUtility.DisplayCustomMenu(position, items.Select(x => x.content).ToArray(), -1,
                     (userData, options, selected) => action(items[selected].value),
                     null);
@@ -206,6 +168,60 @@ public static partial class CoreGUI
 
     }
 
+    public static class PopupCallback
+    {
+        public static Dictionary<int, object> _pendingObjects = new Dictionary<int, object>();
+
+        const string kCommandName = "PopupCallback";
+
+        public static Action<object> MakeCallback(int id)
+        {
+            if (id == 0)
+            {
+                // This means it's just discarded
+                return (o) => { };
+            }
+
+            var iid = Utility.currentGUIID;
+            return delegate (object o)
+            {
+                _pendingObjects[id] = o;
+                Event e;
+#if UNITY_EDITOR
+                if (Utility.isEditorWindow)
+                {
+                    e = UnityEditor.EditorGUIUtility.CommandEvent(kCommandName);
+                }
+                else
+#endif
+                {
+                    e = new Event(ev);
+                    e.type = EventType.ExecuteCommand;
+                    e.commandName = kCommandName;
+                }
+                Utility.SendEvent(e, iid);
+            };
+        }
+
+        public static object GetValue(int id)
+        {
+            if (id == 0)
+                Debug.LogWarning("You're trying to request an object with null ID");
+
+            // Because Layout must be sync with other events...
+            if (ev.type == EventType.ExecuteCommand && ev.commandName == kCommandName)
+            {
+                object o;
+                if (_pendingObjects.TryGetValue(id, out o))
+                {
+                    _pendingObjects.Remove(id);
+                    return o;
+                }
+            }
+            return null;
+        }
+    }
+
     public struct MenuPopupItem
     {
         public GUIContent content;
@@ -215,9 +231,7 @@ public static partial class CoreGUI
 
     public class ColorDialogPopup : PopupBase
     {
-        public override GUIContent TitleContent { get { return C("Color Dialog"); } }
-
-        public override bool IsDraggable { get { return true; } }
+        public override GUIContent PopupContent { get { return C("Color Dialog"); } }
 
         public Color color;
 
@@ -246,13 +260,14 @@ public static partial class CoreGUI
                         GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill);
                         GUI.color = tint;
                     }
+                    GUI.DragWindow(r);
                 }
                 using (Scoped.Horizontal())
                 {
                     hsl = MiniButtons(null, hsvOps, hsl ? 1 : 0) == 1;
                     Toggle(C("Normalized"), true, Styles.MiniButton);
                 }
-                
+
                 if (!hsl)
                 {
                     color.r = FloatSlider(C("R"), color.r, 0, 1);
@@ -275,11 +290,10 @@ public static partial class CoreGUI
                 if (Button(C("OK")))
                 {
                     Apply(color);
-                    Close();
                 }
             }
         }
-        
+
         public ColorDialogPopup(Rect position, Action<object> action, Color color, bool alpha = true) : base(action)
         {
             this.color = color;
@@ -291,7 +305,7 @@ public static partial class CoreGUI
 
         public static void Show(int id, Color color, bool alpha = true)
         {
-            Show(MakeCallback(id), color, alpha);
+            Show(PopupCallback.MakeCallback(id), color, alpha);
         }
 
         public static void Show(Action<object> action, Color color, bool alpha = true)
@@ -307,6 +321,96 @@ public static partial class CoreGUI
             Show(new ColorDialogPopup(position, action, color, alpha));
         }
 
+    }
+
+    public class MessagePopup : PopupBase
+    {
+        public override Vector2 GetSize()
+        {
+            return new Vector2(500, 200);
+        }
+
+        public override bool IsPersistent { get { return true; } }
+
+        public override void OnWindowGUI(int id)
+        {
+            Label(message);
+
+            GUI.DragWindow(LayoutUtility.GetLastRect());
+
+            FlexibleSpace();
+            FlexibleSpace();
+            FlexibleSpace();
+
+            using (Scoped.Horizontal())
+            {
+                FlexibleSpace();
+                for (int i = 0; i < buttons.Length; i++)
+                {
+                    if (Button(buttons[i]))
+                    {
+                        Apply(i);
+                    }
+                }
+            }
+
+            FlexibleSpace();
+
+        }
+
+        public override GUIContent PopupContent { get { return title; } }
+
+        public GUIContent title;
+
+        public GUIContent message;
+
+        public GUIContent[] buttons;
+
+        public MessagePopup(Action<object> action, GUIContent title, GUIContent message, GUIContent[] buttons) : base(action)
+        {
+            this.title = title;
+            this.message = message;
+            this.buttons = buttons;
+            var r = new Rect(Vector2.zero, GetSize());
+            r.center = Utility.screenRect.center;
+            this.SetSafePosition(r);
+        }
+
+        public enum ButtonScheme { OK, YesNo, YesNoCancel, ContinueRetryAbort }
+
+        static Dictionary<ButtonScheme, GUIContent[]> schemes = new Dictionary<ButtonScheme, GUIContent[]>()
+        {
+            { ButtonScheme.OK, Utility.ToGUIContents("OK") },
+            { ButtonScheme.YesNo, Utility.ToGUIContents("Yes", "No") },
+            { ButtonScheme.YesNoCancel, Utility.ToGUIContents("Yes", "No", "Cancel") },
+            { ButtonScheme.ContinueRetryAbort, Utility.ToGUIContents("Continue", "Retry", "Abort") },
+        };
+
+
+        public static void Show(string title, string message)
+        {
+            Show(0, title, message);
+        }
+
+        public static void Show(int id, string title, string message, ButtonScheme scheme = ButtonScheme.OK)
+        {
+            Show(PopupCallback.MakeCallback(id), new GUIContent(title), new GUIContent(message), schemes[scheme]);
+        }
+
+        public static void Show(int id, string title, string message, params string[] buttons)
+        {
+            Show(PopupCallback.MakeCallback(id), new GUIContent(title), new GUIContent(message), Utility.ToGUIContents(buttons));            
+        }
+        
+        public static void Show(int id, GUIContent title, GUIContent message, GUIContent[] buttons)
+        {
+            Show(PopupCallback.MakeCallback(id), title, message, buttons);
+        }
+
+        public static void Show(Action<object> action, GUIContent title, GUIContent message, GUIContent[] buttons)
+        {
+            Show(new MessagePopup(action, title, message, buttons));
+        }
     }
 }
 

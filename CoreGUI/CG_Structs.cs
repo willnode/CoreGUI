@@ -18,7 +18,7 @@ public static partial class CoreGUI
             var r = Reserve();
             var id = GUIUtility.GetControlID(FocusType.Keyboard);
 #if UNITY_EDITOR
-            if (Utility.IsOnEditorWindow())
+            if (Utility.isEditorWindow)
                 return UnityEditor.EditorGUI.ColorField(r, GUIContent.none, color, true, alpha, false);
 #endif
             if (ev.type == EventType.Repaint)
@@ -46,7 +46,7 @@ public static partial class CoreGUI
             }
             else if (ev.type == EventType.ExecuteCommand)
             {
-                var c = PopupBase.GetValue(id);
+                var c = PopupCallback.GetValue(id);
                 if (c != null)
                     return (Color)c;
             }
@@ -75,15 +75,38 @@ public static partial class CoreGUI
         return rect;
     }
 
-    public static Quaternion QuaternionField(GUIContent label, Quaternion quaternion, bool euler = true)
+    public static Quaternion QuaternionField(GUIContent label, Quaternion quaternion, bool asEuler = true)
     {
-        return new Quaternion();
+        BeginHorizontal(label);
+        BeginLabelOption(16, Side.Left);
+        {
+            if (asEuler)
+            {
+                BeginChangeCheck();
+                var eul = quaternion.eulerAngles;
+                eul.x = FloatField(C("X"), eul.x);
+                eul.y = FloatField(C("Y"), eul.y);
+                eul.z = FloatField(C("Z"), eul.z);
+                if (EndChangeCheck())
+                    quaternion = Quaternion.Euler(eul);
+            }
+            else
+            {
+                quaternion.x = FloatField(C("X"), quaternion.x);
+                quaternion.y = FloatField(C("Y"), quaternion.y);
+                quaternion.z = FloatField(C("Z"), quaternion.z);
+                quaternion.w = FloatField(C("W"), quaternion.w);
+            }
+        }
+        EndLabelOption();
+        EndHorizontal();
+        return quaternion;
     }
 
     public static Bounds BoundsField(GUIContent label, Bounds bounds)
     {
         BeginVertical(label);
-        BeginLabelOption(32, Side.Left);
+        BeginLabelOption(38, Side.Left);
         {
             bounds.min = VectorField(C("Min: "), bounds.min);
             bounds.max = VectorField(C("Max: "), bounds.max);
@@ -171,7 +194,7 @@ public static partial class CoreGUI
     public static BoundsInt BoundsField(GUIContent label, BoundsInt bounds)
     {
         BeginVertical(label);
-        BeginLabelOption(32, Side.Left);
+        BeginLabelOption(38, Side.Left);
         {
             bounds.min = VectorField(C("min"), bounds.min);
             bounds.max = VectorField(C("max"), bounds.max);

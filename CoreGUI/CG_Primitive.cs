@@ -62,18 +62,17 @@ public static partial class CoreGUI
         BeginChangeCheck();
 
         var id = GUIUtility.GetControlID(FocusType.Passive);
+        Rect r;
 
-        Rect r = Reserve(null, GUI.skin.textField);
-
-        if (deltaProcessor == null)
-            r = PrefixLabel(r, label, id + 1);
-        else
-        {
-            float delta;
-            r = PrefixSlider(r, label, id, out delta);
-            if (delta != 0)
-                value = deltaProcessor(value, delta);
-        }
+        //if (deltaProcessor == null)
+            r = PrefixLabel(null, GUI.skin.textField, label, id + 1);
+        //else
+        //{
+        //    float delta;
+        //    r = PrefixSlider(Reserve(, label, id, out delta);
+        //    if (delta != 0)
+        //        value = deltaProcessor(value, delta);
+        //}
 
         if (lastNumberAnyID != GUIUtility.keyboardControl)
         {
@@ -129,14 +128,13 @@ public static partial class CoreGUI
     {
         var pos = Reserve();
         var id = GUIUtility.GetControlID(FocusType.Passive, pos);
-        var r = PrefixLabel(pos, label, id + 1);
-        return GUI.TextField(r, value);
+        return GUI.TextField(PrefixLabel(pos, label, id + 1), value);
     }
 
     public static string PasswordField(GUIContent label, string value, char maskChar)
     {
-        var r = PrefixLabel(Reserve(), label);
-        return GUI.PasswordField(r, value ?? "", maskChar);
+        var id = GUIUtility.GetControlID(FocusType.Passive);
+        return GUI.PasswordField(PrefixLabel(null, Styles.TextField, label, id + 1), value ?? "", maskChar);
     }
 
     public static string TextArea(GUIContent label, string value)

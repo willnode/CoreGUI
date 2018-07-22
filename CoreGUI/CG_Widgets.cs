@@ -5,22 +5,6 @@ using UnityEngine;
 public static partial class CoreGUI
 {
 
-    public static void Space(float pixels)
-    {
-        if (LayoutUtility.current.topLevel.isVertical)
-            LayoutUtility.GetRect(0, pixels, LayoutUtility.spaceStyle, Layout.Height(pixels));
-        else
-            LayoutUtility.GetRect(pixels, 0, LayoutUtility.spaceStyle, Layout.Width(pixels));
-    }
-
-    public static void Space()
-    {
-        if (LayoutUtility.current.topLevel.isVertical)
-            LayoutUtility.GetRect(0, 0, GUIStyle.none, Layout.ExpandHeight(true));
-        else
-            LayoutUtility.GetRect(0, 0, GUIStyle.none, Layout.ExpandWidth(true));
-    }
-
     public static bool Button(GUIContent content)
     {
         return ButtonInternal(Indent(Reserve(content, GUI.skin.button)), content, Styles.Button);
@@ -34,14 +18,14 @@ public static partial class CoreGUI
     public static bool Button(GUIContent content, GUIContent prefix)
     {
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
-        var r = PrefixLabel(Reserve(content, GUI.skin.button), prefix, id);
+        var r = PrefixLabel(content, GUI.skin.button, prefix, id);
         return ButtonInternal(r, content, Styles.Button, id);
     }
     
     public static bool Button(GUIContent content, GUIContent prefix, GUIStyle style)
     {
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
-        var r = PrefixLabel(Reserve(content, style), prefix, id);
+        var r = PrefixLabel(content, style, prefix, id);
         return ButtonInternal(r, content, style, id);
     }
 
@@ -84,20 +68,11 @@ public static partial class CoreGUI
                 }
                 break;
             case EventType.Repaint:
-                DrawStyle(r, content, style, id);
+                Utility.DrawStyle(r, content, style, id);
                 break;
         }
         return false;
     }
-
-    private static void DrawStyle(Rect r, GUIContent content, GUIStyle style, int id, bool on = false)
-    {
-        // Primary reason why not simply giveaway ControlID:
-        // The button is not appear to be clicked (active) when clicked via keyboard and mouse is not hovering them.
-        style.Draw(r, content ?? GUIContent.none, r.Contains(ev.mousePosition) || GUIUtility.hotControl == id,
-            GUIUtility.hotControl == id, on, GUIUtility.keyboardControl == id);
-    }
-
     public static bool RepeatButton(GUIContent content)
     {
         return GUI.RepeatButton(Indent(Reserve(content, GUI.skin.button)), content);
@@ -127,7 +102,7 @@ public static partial class CoreGUI
     public static bool Toggle(GUIContent content, bool value, GUIContent prefix)
     {
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
-        var r = PrefixLabel(Reserve(content, GUI.skin.toggle), prefix, id);
+        var r = PrefixLabel(content, GUI.skin.toggle, prefix, id);
         return ToggleInternal(r, value, content, Styles.Toggle);
     }
     
@@ -176,7 +151,7 @@ public static partial class CoreGUI
                 }
                 break;
             case EventType.Repaint:
-                DrawStyle(r, content, style, id, value);
+                Utility.DrawStyle(r, content, style, id, value);
                 break;
         }
         return value;
@@ -200,8 +175,8 @@ public static partial class CoreGUI
 
     public static void Label(GUIContent content, GUIContent prefix)
     {
-        var r = PrefixLabel(Reserve(content), prefix);
-        GUI.Label(r, content);
+        var r = PrefixLabel(content, Styles.Label, prefix);
+        GUI.Label(r, content, Styles.Label);
     }
     
     public static bool Foldout(GUIContent label, bool expanded)

@@ -333,9 +333,14 @@ public static partial class CoreGUI
             }
             current.layoutGroups.Push(g);
             current.topLevel = g;
-            //if (ev.type == EventType.Repaint)
-            //    Styles.Box.Draw(g.rect, false, false, false, false);
+            DebugDraw(g.rect);
             return g;
+        }
+
+        static void DebugDraw(Rect r)
+        {
+            //if (ev.type == EventType.Repaint)
+            //    Styles.Box.Draw(r, false, false, false, false);
         }
 
         // The matching end for BeginLayoutGroup
@@ -435,6 +440,7 @@ public static partial class CoreGUI
                     return kDummyRect;
                 default:
                     var entry = current.topLevel.GetNext();
+                    DebugDraw(entry.rect);
                     //GUIDebugger.LogLayoutEntry(entry.rect, entry.margin, entry.style);
                     return entry.rect;
             }
@@ -468,12 +474,16 @@ public static partial class CoreGUI
                 case EventType.Used:
                     return kDummyRect;
                 default:
-                    return current.topLevel.GetNext().rect;
+                    var entry = current.topLevel.GetNext();
+                    DebugDraw(entry.rect);
+                    return entry.rect;
             }
         }
 
+        public static bool isVertical { get { return current.topLevel.isVertical; } }
+
         // Get the rectangle of current layout group.
-        public static Rect GetContainerRect()
+        public static Rect GetContainerRect(bool unpacked = false)
         {
             switch (Event.current.type)
             {
@@ -481,7 +491,10 @@ public static partial class CoreGUI
                 case EventType.Used:
                     return kDummyRect;
                 default:
-                    return current.topLevel.rect;
+                    var r = current.topLevel.rect;
+                    if (unpacked)
+                        r = current.topLevel.margin.Add(r);
+                    return r;
             }
         }
 
@@ -513,7 +526,9 @@ public static partial class CoreGUI
                 case EventType.Used:
                     return kDummyRect;
                 default:
-                    return current.topLevel.GetNext().rect;
+                    var entry = current.topLevel.GetNext();
+                    DebugDraw(entry.rect);
+                    return entry.rect;
             }
         }
 

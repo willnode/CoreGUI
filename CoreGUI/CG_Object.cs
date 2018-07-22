@@ -70,8 +70,8 @@ public static partial class CoreGUI
 #if UNITY_EDITOR
         else if (typeof(UnityEngine.Object).IsAssignableFrom(type))
         {
-            if (Utility.IsOnEditorWindow())
-                return UnityEditor.EditorGUI.ObjectField(PrefixLabel(Reserve(), label), (UnityEngine.Object)value, type, true);
+            if (Utility.isEditorWindow)
+                return UnityEditor.EditorGUI.ObjectField(PrefixLabel(null, null, label), (UnityEngine.Object)value, type, true);
             else
                 return value; // TODO
         }
