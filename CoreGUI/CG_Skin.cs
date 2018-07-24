@@ -9,7 +9,7 @@ public static partial class CoreGUI
 {
     public class Styles
     {
-        private GUISkin skin;
+        public readonly GUISkin skin;
 
         public Styles(GUISkin skin)
         {
@@ -38,6 +38,13 @@ public static partial class CoreGUI
             return skin.FindStyle(name);
         }
 
+        GUIStyle DeriveStyle(GUIStyle sample, Action<GUIStyle> steps)
+        {
+            var style = new GUIStyle(sample);
+            steps(style);
+            return style;
+        }
+
         public void Invalidate()
         {
             m_Box = skin.box;
@@ -64,6 +71,8 @@ public static partial class CoreGUI
             m_VerticalScrollbarUpButton = skin.verticalScrollbarUpButton;
             m_VerticalScrollbarDownButton = skin.verticalScrollbarDownButton;
 
+            // As far I'm aware this GetStyle is not case-sensitive.
+
             m_MiniLabel = GetStyle("miniLabel") ?? m_Label;
             m_LargeLabel = GetStyle("LargeLabel") ?? m_Label;
             m_BoldLabel = GetStyle("BoldLabel") ?? m_Label;
@@ -87,16 +96,20 @@ public static partial class CoreGUI
             m_Tooltip = GetStyle("Tooltip") ?? m_Box;
             m_NotificationText = GetStyle("NotificationText") ?? m_Label;
             m_NotificationBackground = GetStyle("NotificationBackground") ?? m_Box;
-            m_Popup = GetStyle("MiniPopup") ?? m_DropDownList;
+            m_Popup = GetStyle("MiniPopup") ?? GetStyle("Popup") ?? m_DropDownList;
             m_NumberField = GetStyle("textField") ?? m_TextField;
             m_ToggleMixed = GetStyle("ToggleMixed") ?? m_Toggle;
             m_ColorField = GetStyle("ColorField") ?? m_Box;
             m_Foldout = GetStyle("Foldout") ?? m_Toggle;
-            m_Prefix = GetStyle("Prefix") ?? m_Label;
-            m_LinkLabel = GetStyle("LinkLabel") ?? new GUIStyle(m_Label);
-            m_LinkLabel.normal.textColor = new Color(0.25f, 0.5f, 0.9f, 1f);
-            m_LinkLabel.stretchWidth = false;
-            m_TextArea.wordWrap = true;
+            m_Prefix = GetStyle("Prefix") ?? DeriveStyle(m_Label, (s) =>
+            {
+                s.padding = new RectOffset(4, 0, 3, 3);
+            });
+            m_LinkLabel = GetStyle("LinkLabel") ?? DeriveStyle(m_Label, (s) =>
+            {
+                s.normal.textColor = new Color(0.25f, 0.5f, 0.9f, 1f);
+                s.stretchWidth = false;
+            });
         }
 
         private static Dictionary<int, Styles> s_Skins = new Dictionary<int, Styles>();
@@ -119,6 +132,13 @@ public static partial class CoreGUI
                 s_FastCurSkinID = id;
                 return s_FastCurSkin = skin;
             }
+        }
+
+        public static void InvalidateSkins()
+        {
+            s_FastCurSkinID = 0;
+            s_FastCurSkin = null;
+            s_Skins.Clear();
         }
 
         public static GUIStyle Box { get { return CurrentSkin.m_Box; } }

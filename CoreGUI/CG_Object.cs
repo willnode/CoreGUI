@@ -18,23 +18,24 @@ public static partial class CoreGUI
 
     static void InitializePropertyFieldCache()
     {
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
         _propertyFieldCache = new Dictionary<Type, Func<GUIContent, object, object>>();
         // Common
         AddPropHandler<bool>((l, v) => Checkbox(l, (bool)v));
         AddPropHandler<string>((l, v) => TextField(l, (string)v));
         // Numbers
-        AddPropHandler<int>((l, v) => NumberField(l, (int)v, int.TryParse));
-        AddPropHandler<uint>((l, v) => NumberField(l, (uint)v, uint.TryParse));
-        AddPropHandler<long>((l, v) => NumberField(l, (long)v, long.TryParse));
-        AddPropHandler<ulong>((l, v) => NumberField(l, (ulong)v, ulong.TryParse));
-        AddPropHandler<short>((l, v) => NumberField(l, (short)v, short.TryParse));
-        AddPropHandler<ushort>((l, v) => NumberField(l, (ushort)v, ushort.TryParse));
-        AddPropHandler<byte>((l, v) => NumberField(l, (byte)v, byte.TryParse));
-        AddPropHandler<sbyte>((l, v) => NumberField(l, (sbyte)v, sbyte.TryParse));
-        AddPropHandler<float>((l, v) => NumberField(l, (float)v, float.TryParse));
-        AddPropHandler<double>((l, v) => NumberField(l, (double)v, double.TryParse));
-        AddPropHandler<decimal>((l, v) => NumberField(l, (decimal)v, decimal.TryParse));
-        AddPropHandler<DateTime>((l, v) => NumberField(l, (DateTime)v, DateTime.TryParse));
+        AddPropHandler<int>((l, v) => NumberField(l, (int)v, int.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<uint>((l, v) => NumberField(l, (uint)v, uint.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<long>((l, v) => NumberField(l, (long)v, long.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<ulong>((l, v) => NumberField(l, (ulong)v, ulong.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<short>((l, v) => NumberField(l, (short)v, short.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<ushort>((l, v) => NumberField(l, (ushort)v, ushort.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<byte>((l, v) => NumberField(l, (byte)v, byte.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<sbyte>((l, v) => NumberField(l, (sbyte)v, sbyte.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<float>((l, v) => NumberField(l, (float)v, float.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<double>((l, v) => NumberField(l, (double)v, double.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<decimal>((l, v) => NumberField(l, (decimal)v, decimal.TryParse, (i) => i.ToString(culture)));
+        AddPropHandler<DateTime>((l, v) => NumberField(l, (DateTime)v, DateTime.TryParse, (i) => i.ToString(culture)));
         // Vectors
         AddPropHandler<Vector2>((l, v) => VectorField(l, (Vector2)v));
         AddPropHandler<Vector3>((l, v) => VectorField(l, (Vector3)v));
@@ -71,7 +72,7 @@ public static partial class CoreGUI
         else if (typeof(UnityEngine.Object).IsAssignableFrom(type))
         {
             if (Utility.isEditorWindow)
-                return UnityEditor.EditorGUI.ObjectField(PrefixLabel(null, null, label), (UnityEngine.Object)value, type, true);
+                return UnityEditor.EditorGUI.ObjectField(PrefixLabel(null, UnityEditor.EditorStyles.objectField, label), (UnityEngine.Object)value, type, true);
             else
                 return value; // TODO
         }

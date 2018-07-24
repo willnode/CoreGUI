@@ -40,7 +40,6 @@ public static partial class CoreGUI
         public sealed class LayoutCache
         {
             public LayoutGroup topLevel = new LayoutGroup();
-
             public Stack<LayoutGroup> layoutGroups = new Stack<LayoutGroup>();
             public LayoutGroup windows = new LayoutGroup();
 
@@ -102,10 +101,15 @@ public static partial class CoreGUI
             // Make a vertical group to encompass the whole thing
             if (Event.current.type == EventType.Layout)
             {
-                current.topLevel = cache.topLevel = new LayoutGroup();
+                if (cache.topLevel != null)
+                    cache.topLevel.Flush();
+                if (cache.windows != null)
+                    cache.windows.Flush();
+
+                current.topLevel = cache.topLevel = MemPool<LayoutGroup>.Get();
                 current.layoutGroups.Clear();
                 current.layoutGroups.Push(current.topLevel);
-                current.windows = cache.windows = new LayoutGroup();
+                current.windows = cache.windows = MemPool<LayoutGroup>.Get();
             }
             else
             {
@@ -154,13 +158,6 @@ public static partial class CoreGUI
                 current.windows = cache.windows;
             }
         }
-
-        // TODO: actually make these check...
-        [Obsolete("BeginGroup has no effect and will be removed", false)]
-        public static void BeginGroup(string GroupName) { }
-
-        [Obsolete("EndGroup has no effect and will be removed", false)]
-        public static void EndGroup(string groupName) { }
 
         public static void Layout()
         {
@@ -302,22 +299,15 @@ public static partial class CoreGUI
             //}
         }
 
-        static LayoutGroup CreateLayoutGroupInstanceOfType(Type LayoutType)
-        {
-            if (!typeof(LayoutGroup).IsAssignableFrom(LayoutType))
-                throw new ArgumentException("LayoutType needs to be of type LayoutGroup");
-            return (LayoutGroup)Activator.CreateInstance(LayoutType);
-        }
-
         // Generic helper - use this when creating a layoutgroup. It will make sure everything is wired up correctly.
-        public static LayoutGroup BeginLayoutGroup(GUIStyle style, LayoutOption[] options, Type layoutType)
+        public static LayoutGroup BeginLayoutGroup<T>(GUIStyle style, LayoutOption[] options) where T : LayoutGroup, new()
         {
             LayoutGroup g;
             switch (Event.current.type)
             {
                 case EventType.Used:
                 case EventType.Layout:
-                    g = CreateLayoutGroupInstanceOfType(layoutType);
+                    g = MemPool<T>.Get();
                     g.style = style;
                     if (options != null)
                         g.ApplyOptions(options);
@@ -355,7 +345,7 @@ public static partial class CoreGUI
                 return;
             }
             //if (Event.current.type != EventType.Layout && Event.current.type != EventType.Used)
-                //GUIDebugger.LogLayoutEndGroup();
+            //GUIDebugger.LogLayoutEndGroup();
 
             current.layoutGroups.Pop();
             if (0 < current.layoutGroups.Count)
@@ -365,14 +355,14 @@ public static partial class CoreGUI
         }
 
         // Generic helper - use this when creating a layout group. It will make sure everything is wired up correctly.
-        public static LayoutGroup BeginLayoutArea(GUIStyle style, Type layoutType)
+        public static LayoutGroup BeginLayoutArea<T>(GUIStyle style) where T : LayoutGroup, new()
         {
             LayoutGroup g;
             switch (Event.current.type)
             {
                 case EventType.Used:
                 case EventType.Layout:
-                    g = CreateLayoutGroupInstanceOfType(layoutType);
+                    g = MemPool<T>.Get();
                     g.style = style;
                     current.windows.Add(g);
                     break;
@@ -390,9 +380,9 @@ public static partial class CoreGUI
         }
 
         // Trampoline for Editor stuff
-        public static LayoutGroup DoBeginLayoutArea(GUIStyle style, Type layoutType)
+        public static LayoutGroup DoBeginLayoutArea<T>(GUIStyle style) where T : LayoutGroup, new()
         {
-            return BeginLayoutArea(style, layoutType);
+            return BeginLayoutArea<T>(style);
         }
 
         public static LayoutGroup topLevel => current.topLevel;
@@ -410,7 +400,7 @@ public static partial class CoreGUI
                 case EventType.Layout:
                     if (style.isHeightDependantOnWidth)
                     {
-                        current.topLevel.Add(new WordWrapSizer(style, content, options));
+                        current.topLevel.Add(WordWrapSizer.Get(style, content, options));
                     }
                     else
                     {
@@ -432,7 +422,7 @@ public static partial class CoreGUI
                         }
 
                         Vector2 size = Utility.CalcSizeWithConstraints(style, content, sizeConstraints);
-                        current.topLevel.Add(new LayoutEntry(size.x, size.x, size.y, size.y, style, options));
+                        current.topLevel.Add(LayoutEntry.Get(size.x, size.x, size.y, size.y, style, options));
                     }
                     return kDummyRect;
 
@@ -469,7 +459,7 @@ public static partial class CoreGUI
             switch (Event.current.type)
             {
                 case EventType.Layout:
-                    current.topLevel.Add(new LayoutEntry(minWidth, maxWidth, minHeight, maxHeight, style, options));
+                    current.topLevel.Add(LayoutEntry.Get(minWidth, maxWidth, minHeight, maxHeight, style, options));
                     return kDummyRect;
                 case EventType.Used:
                     return kDummyRect;
@@ -521,7 +511,7 @@ public static partial class CoreGUI
             switch (Event.current.type)
             {
                 case EventType.Layout:
-                    current.topLevel.Add(new AspectSizer(aspect, options));
+                    current.topLevel.Add(AspectSizer.Get(aspect, options));
                     return kDummyRect;
                 case EventType.Used:
                     return kDummyRect;
@@ -537,8 +527,11 @@ public static partial class CoreGUI
         {
             get
             {
-                if (s_SpaceStyle == null) s_SpaceStyle = new GUIStyle();
-                s_SpaceStyle.stretchWidth = false;
+                if (s_SpaceStyle == null)
+                {
+                    s_SpaceStyle = new GUIStyle();
+                    s_SpaceStyle.stretchWidth = false;
+                }
                 return s_SpaceStyle;
             }
         }
@@ -577,17 +570,57 @@ public static partial class CoreGUI
         readonly RectOffset m_Margin = new RectOffset();
         public override RectOffset margin { get { return m_Margin; } }
 
+        public LayoutGroup() { }
 
-        public LayoutGroup() : base(0, 0, 0, 0, GUIStyle.none) { }
-
-        public LayoutGroup(GUIStyle _style, LayoutOption[] options) : base(0, 0, 0, 0, _style)
+        public static LayoutGroup Get()
         {
+            return Get(GUIStyle.none, null);
+        }
+
+        public static LayoutGroup Get(GUIStyle _style, LayoutOption[] options)
+        {
+            var lyt = MemPool<LayoutGroup>.Get();
+            lyt.style = _style;
             if (options != null)
-                ApplyOptions(options);
-            m_Margin.left = _style.margin.left;
-            m_Margin.right = _style.margin.right;
-            m_Margin.top = _style.margin.top;
-            m_Margin.bottom = _style.margin.bottom;
+                lyt.ApplyOptions(options);
+            lyt.m_Margin.left = _style.margin.left;
+            lyt.m_Margin.right = _style.margin.right;
+            lyt.m_Margin.top = _style.margin.top;
+            lyt.m_Margin.bottom = _style.margin.bottom;
+            return lyt;
+        }
+
+        public override void Flush()
+        {
+            FlushBase();
+            MemPool<LayoutGroup>.Release(this);
+        }
+
+        public override void FlushBase()
+        {
+            base.FlushBase();
+            foreach (var entry in entries)
+            {
+                entry.Flush();
+            }
+            entries.Clear();
+
+            isVertical = true;
+            resetCoords = false;
+            spacing = 0;
+            sameSize = true;
+            isWindow = false;
+            windowID = -1;
+            m_Cursor = 0;
+            m_StretchableCountX = 100;
+            m_StretchableCountY = 100;
+            m_UserSpecifiedWidth = false;
+            m_UserSpecifiedHeight = false;
+
+            m_ChildMinWidth = 100;
+            m_ChildMaxWidth = 100;
+            m_ChildMinHeight = 100;
+            m_ChildMaxHeight = 100;
         }
 
         public override void ApplyOptions(LayoutOption[] options)
@@ -926,12 +959,12 @@ public static partial class CoreGUI
                 return;
             }
 
-                int topMarginMin = 0;
-                int bottomMarginMin = 0;
+            int topMarginMin = 0;
+            int bottomMarginMin = 0;
 
-                m_ChildMinHeight = 0;
-                m_ChildMaxHeight = 0;
-                m_StretchableCountY = 0;
+            m_ChildMinHeight = 0;
+            m_ChildMaxHeight = 0;
+            m_StretchableCountY = 0;
 
             if (isVertical)
             {
@@ -1165,7 +1198,7 @@ public static partial class CoreGUI
         }
     }
 
-    public class LayoutEntry
+    public class LayoutEntry : IFlushable
     {
         // The min and max sizes. Used during calculations...
         public float minWidth, maxWidth, minHeight, maxHeight;
@@ -1190,25 +1223,33 @@ public static partial class CoreGUI
         // The margins of this element.
         public virtual RectOffset margin { get { return style.margin; } }
 
-        public LayoutEntry(float _minWidth, float _maxWidth, float _minHeight, float _maxHeight, GUIStyle _style)
+        bool IFlushable.IsFlushed { get; set; }
+
+        public static LayoutEntry Get(float _minWidth, float _maxWidth, float _minHeight, float _maxHeight, GUIStyle _style)
         {
-            minWidth = _minWidth;
-            maxWidth = _maxWidth;
-            minHeight = _minHeight;
-            maxHeight = _maxHeight;
+            var lyt = MemPool<LayoutEntry>.Get();
+            lyt.minWidth = _minWidth;
+            lyt.maxWidth = _maxWidth;
+            lyt.minHeight = _minHeight;
+            lyt.maxHeight = _maxHeight;
             if (_style == null)
                 _style = GUIStyle.none;
-            style = _style;
+            lyt.style = _style;
+            return lyt;
         }
 
-        public LayoutEntry(float _minWidth, float _maxWidth, float _minHeight, float _maxHeight, GUIStyle _style, LayoutOption[] options)
+        public static LayoutEntry Get(float _minWidth, float _maxWidth, float _minHeight, float _maxHeight, GUIStyle _style, LayoutOption[] options)
         {
-            minWidth = _minWidth;
-            maxWidth = _maxWidth;
-            minHeight = _minHeight;
-            maxHeight = _maxHeight;
-            style = _style;
-            ApplyOptions(options);
+            var lyt = MemPool<LayoutEntry>.Get();
+            lyt.minWidth = _minWidth;
+            lyt.maxWidth = _maxWidth;
+            lyt.minHeight = _minHeight;
+            lyt.maxHeight = _maxHeight;
+            if (_style == null)
+                _style = GUIStyle.none;
+            lyt.style = _style;
+            lyt.ApplyOptions(options);
+            return lyt;
         }
 
         public virtual void CalcWidth() { }
@@ -1258,6 +1299,21 @@ public static partial class CoreGUI
             return space + String.Format("{1}-{0} (x:{2}-{3}, y:{4}-{5})", style != null ? style.name : "NULL", GetType(), rect.x, rect.xMax, rect.y, rect.yMax) +
                 "   -   W: " + minWidth + "-" + maxWidth + (stretchWidth != 0 ? "+" : "") + ", H: " + minHeight + "-" + maxHeight + (stretchHeight != 0 ? "+" : "");
         }
+
+        public virtual void Flush()
+        {
+            FlushBase();
+            MemPool<LayoutEntry>.Release(this);
+        }
+
+        public virtual void FlushBase()
+        {
+            minWidth = maxWidth = minHeight = maxHeight = stretchHeight = stretchWidth = 0;
+
+            m_Style = GUIStyle.none;
+
+            rect = new Rect();
+        }
     }
 
     // Layouter that makes elements which sizes will always conform to a specific aspect ratio.
@@ -1265,15 +1321,24 @@ public static partial class CoreGUI
     {
         float aspect;
 
-        public AspectSizer(float aspect, LayoutOption[] options) : base(0, 0, 0, 0, GUIStyle.none)
+        public static AspectSizer Get(float aspect, LayoutOption[] options)
         {
-            this.aspect = aspect;
-            ApplyOptions(options);
+            var lyt = MemPool<AspectSizer>.Get();
+            lyt.aspect = aspect;
+            lyt.style = GUIStyle.none;
+            lyt.ApplyOptions(options);
+            return lyt;
         }
 
         public override void CalcHeight()
         {
             minHeight = maxHeight = rect.width / aspect;
+        }
+
+        public override void Flush()
+        {
+            FlushBase();
+            MemPool<AspectSizer>.Release(this);
         }
     }
 
@@ -1288,7 +1353,7 @@ public static partial class CoreGUI
             switch (Event.current.type)
             {
                 case EventType.Layout:
-                    LayoutUtility.current.topLevel.Add(new GridSizer(contents, xCount, style, options));
+                    LayoutUtility.current.topLevel.Add(GridSizer.Get(contents, xCount, style, options));
                     break;
                 case EventType.Used:
                     return kDummyRect;
@@ -1299,15 +1364,24 @@ public static partial class CoreGUI
             return r;
         }
 
-        readonly int m_Count;
-        readonly int m_XCount;
-        readonly float m_MinButtonWidth = -1;
-        readonly float m_MaxButtonWidth = -1;
-        readonly float m_MinButtonHeight = -1;
-        readonly float m_MaxButtonHeight = -1;
+        int m_Count;
+        int m_XCount;
+        float m_MinButtonWidth = -1;
+        float m_MaxButtonWidth = -1;
+        float m_MinButtonHeight = -1;
+        float m_MaxButtonHeight = -1;
 
-        private GridSizer(GUIContent[] contents, int xCount, GUIStyle buttonStyle, LayoutOption[] options) : base(0, 0, 0, 0, GUIStyle.none)
+        private static GridSizer Get(GUIContent[] contents, int xCount, GUIStyle buttonStyle, LayoutOption[] options)
         {
+            var lyt = MemPool<GridSizer>.Get();
+            lyt.Init(contents, xCount, buttonStyle, options);
+            return lyt;
+        }
+
+
+        private void Init(GUIContent[] contents, int xCount, GUIStyle buttonStyle, LayoutOption[] options)
+        {
+
             m_Count = contents.Length;
             m_XCount = xCount;
 
@@ -1426,18 +1500,39 @@ public static partial class CoreGUI
     // Class that can handle word-wrap sizing. this is specialcased as setting width can make the text wordwrap, which would then increase height...
     public sealed class WordWrapSizer : LayoutEntry
     {
-        readonly GUIContent m_Content;
+        readonly GUIContent m_Content = new GUIContent();
         // We need to differentiate between min & maxHeight we calculate for ourselves and one that is forced by the user
         // (When inside a scrollview, we can be told to layout twice, so we need to know the difference)
-        readonly float m_ForcedMinHeight;
-        readonly float m_ForcedMaxHeight;
+        float m_ForcedMinHeight;
+        float m_ForcedMaxHeight;
 
-        public WordWrapSizer(GUIStyle style, GUIContent content, LayoutOption[] options) : base(0, 0, 0, 0, style)
+        public static WordWrapSizer Get(GUIStyle style, GUIContent content, LayoutOption[] options)
         {
-            m_Content = new GUIContent(content);
-            ApplyOptions(options);
-            m_ForcedMinHeight = minHeight;
-            m_ForcedMaxHeight = maxHeight;
+            var lyt = MemPool<WordWrapSizer>.Get();
+            lyt.style = style ?? GUIStyle.none;
+            lyt.m_Content.text = content.text;
+            lyt.m_Content.image = content.image;
+            lyt.m_Content.tooltip = content.tooltip;
+            lyt.ApplyOptions(options);
+            lyt.m_ForcedMinHeight = lyt.minHeight;
+            lyt.m_ForcedMaxHeight = lyt.maxHeight;
+            return lyt;
+        }
+
+        public override void Flush()
+        {
+            FlushBase();
+            MemPool<WordWrapSizer>.Release(this);
+        }
+
+        public override void FlushBase()
+        {
+            base.FlushBase();
+            m_ForcedMaxHeight = 0;
+            m_ForcedMinHeight = 0;
+            m_Content.text = null;
+            m_Content.image = null;
+            m_Content.tooltip = null;
         }
 
         public override void CalcWidth()
@@ -1505,7 +1600,16 @@ public static partial class CoreGUI
         public bool needsHorizontalScrollbar, needsVerticalScrollbar;
         public GUIStyle horizontalScrollbar, verticalScrollbar;
 
-        public ScrollGroup() { }
+        public static new ScrollGroup Get()
+        {
+            return MemPool<ScrollGroup>.Get();
+        }
+
+        public override void Flush()
+        {
+            FlushBase();
+            MemPool<ScrollGroup>.Release(this);
+        }
 
         public override void CalcWidth()
         {
@@ -1692,6 +1796,18 @@ public static partial class CoreGUI
             base.CalcHeight();
             minHeight *= fadeValue;
             maxHeight *= fadeValue;
+        }
+
+        public static new LayoutFadeGroup Get()
+        {
+            var lyt = MemPool<LayoutFadeGroup>.Get();
+            return lyt;
+        }
+
+        public override void Flush()
+        {
+            FlushBase();
+            MemPool<LayoutFadeGroup>.Release(this);
         }
     }
 }

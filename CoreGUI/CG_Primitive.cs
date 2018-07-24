@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -37,27 +38,34 @@ public static partial class CoreGUI
 
     public static double DoubleField(GUIContent label, double value)
     {
-        return NumberField(label, value, double.TryParse);
+        return NumberField(label, value, double.TryParse, x => x.ToString(CultureInfo.InvariantCulture));
     }
 
     public static float FloatField(GUIContent label, float value)
     {
-        return NumberField(label, value, float.TryParse, (v, d) => v == 0 ? d : v + d * 0.1f);
+        return NumberField(label, value, float.TryParse, x => x.ToString(CultureInfo.InvariantCulture), (v, d) => v == 0 ? d : v + d * 0.1f);
     }
 
     public static int IntField(GUIContent label, int value)
     {
-        return NumberField(label, value, int.TryParse, (v, d) => v + (int)d);
+        return NumberField(label, value, int.TryParse, x => x.ToString(CultureInfo.InvariantCulture), (v, d) => v + (int)d);
     }
 
     public delegate bool TryParseFunc<T2>(string s, out T2 result);
-    
 
     static string lastNumberStr;
     static int lastNumberID;
-    static int lastNumberAnyID;
+    static int lastFocusRuntimeID;
+    static int lastFocusEditorID;
 
-    static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser, Func<T, float, T> deltaProcessor = null)
+    static int lastFocusID
+    {
+        // Unity Editor has doing amazing job separating keyboard control....
+        get { return _isEditorWindow ? lastFocusEditorID : lastFocusRuntimeID; }
+        set { if (_isEditorWindow) lastFocusEditorID = value; else lastFocusRuntimeID = value; }
+    }
+
+    static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser, Func<T, string> stringifier = null, Func<T, float, T> deltaProcessor = null)
     {
         BeginChangeCheck();
 
@@ -65,7 +73,7 @@ public static partial class CoreGUI
         Rect r;
 
         //if (deltaProcessor == null)
-            r = PrefixLabel(null, GUI.skin.textField, label, id + 1);
+        r = PrefixLabel(null, GUI.skin.textField, label, id + 1);
         //else
         //{
         //    float delta;
@@ -74,13 +82,13 @@ public static partial class CoreGUI
         //        value = deltaProcessor(value, delta);
         //}
 
-        if (lastNumberAnyID != GUIUtility.keyboardControl)
+        if (lastFocusID != GUIUtility.keyboardControl)
         {
-            lastNumberAnyID = GUIUtility.keyboardControl;
+            lastFocusID = GUIUtility.keyboardControl;
             lastNumberID = -1;
         }
 
-        var v = GUI.TextField(r, lastNumberID == id ? lastNumberStr : value.ToString());
+        var v = GUI.TextField(r, lastNumberID == id ? lastNumberStr : (stringifier == null ? value.ToString() : stringifier(value)));
 
         if (EndChangeCheck())
         {
@@ -100,7 +108,7 @@ public static partial class CoreGUI
 
     static public float HorizontalSlider(GUIContent label, float value, float min, float max)
     {
-        var r = PrefixLabel(Reserve(), label);
+        var r = PrefixLabel(null, Styles.HorizontalSlider, label);
         r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
 
@@ -179,7 +187,7 @@ public static partial class CoreGUI
                         return text; //Maybe we catch the wrong one?
 
                     var s = style.CalcHeight(C(value), r.width);
-                    
+
                     r.xMin = r.xMax;
                     r.width = 14;
 

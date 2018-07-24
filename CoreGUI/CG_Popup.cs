@@ -44,9 +44,12 @@ public static partial class CoreGUI
             {
                 var local = position;
                 local.position = Vector2.zero;
+                var paddedlocal = PopupStyle.padding.Remove(local);
+                paddedlocal.size *= callerScale;
                 local.size *= callerScale;
+                local.position = -paddedlocal.position;
 
-                BeginGUI(idd, local, callerSkin, callerScale);
+                BeginGUI(idd, paddedlocal, callerSkin, callerScale);
 
                 OnWindowGUI(idd);
 
@@ -91,10 +94,11 @@ public static partial class CoreGUI
             shownPopup.Add(popup.callerGUIID, popup);
         }
 
-        protected void SetSafePosition(Rect pos)
+        protected void SetSafePosition(Rect pos, bool shouldBePutInBottom = true)
         {
             position = pos;
-            position.y += position.height; // If position == widget rect, show under it.
+            if (shouldBePutInBottom)
+                position.y += position.height; // If position == widget rect, show under it.
             position.size = Vector2.Max(position.size, GetSize());
             position.position = Vector2.Max(Vector2.zero, Vector2.Min(position.position, new Vector2(Screen.width, Screen.height) - position.size));
         }
@@ -241,14 +245,14 @@ public static partial class CoreGUI
 
         public override Vector2 GetSize()
         {
-            return new Vector2(400, 300);
+            return new Vector2(300, 300);
         }
 
-        static GUIContent[] hsvOps = new GUIContent[] { new GUIContent("RGB"), new GUIContent("HSV") };
+        static GUIContent[] hsvOps = Utility.ToGUIContents("RGB", "HSV");
 
         public override void OnWindowGUI(int id)
         {
-            using (Scoped.Indent())
+            //using (Scoped.Indent())
             using (Scoped.LabelOption(16, Side.Left))
             {
                 {
@@ -276,14 +280,18 @@ public static partial class CoreGUI
                 }
                 else
                 {
-                    float h, s, v;
+                    float h, s, v, a;
                     Color.RGBToHSV(color, out h, out s, out v);
                     BeginChangeCheck();
                     h = FloatSlider(C("H"), h, 0, 1);
                     s = FloatSlider(C("S"), s, 0, 1);
                     v = FloatSlider(C("V"), v, 0, 1);
                     if (EndChangeCheck())
+                    {
+                        a = color.a;
                         color = Color.HSVToRGB(h, s, v);
+                        color.a = a;
+                    }
                 }
                 if (alpha)
                     color.a = FloatSlider(C("A"), color.a, 0, 1);
@@ -371,9 +379,13 @@ public static partial class CoreGUI
             this.title = title;
             this.message = message;
             this.buttons = buttons;
-            var r = new Rect(Vector2.zero, GetSize());
-            r.center = Utility.screenRect.center;
-            this.SetSafePosition(r);
+
+            Utility.delayCall += delegate
+            {
+                var r = new Rect(Vector2.zero, GetSize());
+                r.center = Utility.screenRect.center;
+                this.SetSafePosition(r, false);
+            };
         }
 
         public enum ButtonScheme { OK, YesNo, YesNoCancel, ContinueRetryAbort }

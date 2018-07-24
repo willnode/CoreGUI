@@ -20,7 +20,7 @@ public static partial class CoreGUI
         if (label != null)
         {
             bool wasVertical = LayoutUtility.isVertical;
-            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, layoutOptions, typeof(LayoutGroup));
+            LayoutGroup g = LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, layoutOptions);
             g.isVertical = prefixLabelSide >= Side.Top;
 
             if (prefixLabelSide == Side.Left)
@@ -40,7 +40,7 @@ public static partial class CoreGUI
             if ((indentPolicy != IndentPolicy.None && indentPolicy != IndentPolicy.Label && indentLevel > 0) &&
                 (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
             {
-                LayoutUtility.BeginLayoutGroup(GUIStyle.none, layoutOptions, typeof(LayoutGroup)).isVertical = false;
+                LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, layoutOptions).isVertical = false;
                 Space(indentLevel * 16);
             }
 
@@ -264,10 +264,21 @@ public static partial class CoreGUI
     {
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
 
+        Rect r;
         if (LayoutUtility.isVertical)
-            return LayoutUtility.GetRect(0, pixels, LayoutUtility.spaceStyle, Layout.Height(pixels));
+        {
+            var arr = ArrayPool<LayoutOption>.Get(Layout.Height(pixels));
+            r = LayoutUtility.GetRect(0, pixels, LayoutUtility.spaceStyle, arr);
+            ArrayPool<LayoutOption>.Release(arr);
+        }
         else
-            return LayoutUtility.GetRect(pixels, 0, LayoutUtility.spaceStyle, Layout.Width(pixels));
+        {
+            var arr = ArrayPool<LayoutOption>.Get(Layout.Width(pixels));
+            r = LayoutUtility.GetRect(pixels, 0, LayoutUtility.spaceStyle, arr);
+            ArrayPool<LayoutOption>.Release(arr);
+        }
+
+        return r;
     }
 
     /// <summary>
@@ -333,10 +344,9 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
 
         PrefixLabelStart(label);
-        if (label != null)
-            BeginIndent(0, IndentPolicy.Widgets);
+        BeginIndent(0, IndentPolicy.Widgets);
         {
-            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(LayoutGroup));
+            LayoutGroup g = LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, options);
             g.isVertical = false;
             return g.rect;
         }
@@ -347,8 +357,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return;
 
         LayoutUtility.EndLayoutGroup();
-        if (prefixLabels.Peek() != null)
-            EndIndent();
+        EndIndent();
         PrefixLabelEnd();
     }
 
@@ -362,10 +371,9 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
 
         PrefixLabelStart(label);
-        if (label != null)
-            BeginIndent(0, IndentPolicy.Widgets);
+        BeginIndent(0, IndentPolicy.Widgets);
         {
-            LayoutGroup g = LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(LayoutGroup));
+            LayoutGroup g = LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, options);
             g.isVertical = true;
             return g.rect;
         }
@@ -376,8 +384,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return;
 
         LayoutUtility.EndLayoutGroup();
-        if (prefixLabels.Peek() != null)
-            EndIndent();
+        EndIndent();
         PrefixLabelEnd();
     }
 
@@ -400,7 +407,7 @@ public static partial class CoreGUI
     {
         if (Utility.currentCustomEvent != null) return scroll;
 
-        ScrollGroup g = (ScrollGroup)LayoutUtility.BeginLayoutGroup(GUIStyle.none, options, typeof(ScrollGroup));
+        ScrollGroup g = (ScrollGroup)LayoutUtility.BeginLayoutGroup<ScrollGroup>(GUIStyle.none, options);
         switch (Event.current.type)
         {
             case EventType.Layout:
@@ -417,7 +424,8 @@ public static partial class CoreGUI
             default:
                 break;
         }
-        return GUI.BeginScrollView(g.rect, scroll, new Rect(0, 0, g.clientWidth, g.clientHeight), alwaysShowHorizontal, alwaysShowVertical);
+        return GUI.BeginScrollView(g.rect, scroll, new Rect(0, 0, g.clientWidth, g.clientHeight),
+            alwaysShowHorizontal, alwaysShowVertical, Styles.HorizontalScrollbar, Styles.VerticalScrollbar);
     }
 
     public static void EndScrollView()
@@ -432,7 +440,7 @@ public static partial class CoreGUI
     {
         if (Utility.currentCustomEvent != null) return;
 
-        LayoutGroup g = LayoutUtility.BeginLayoutArea(GUIStyle.none, typeof(LayoutGroup));
+        LayoutGroup g = LayoutUtility.BeginLayoutArea<LayoutGroup>(GUIStyle.none);
         if (Event.current.type == EventType.Layout)
         {
             g.resetCoords = true;
@@ -602,8 +610,8 @@ public static partial class CoreGUI
 
         if (!string.IsNullOrEmpty(text))
         {
-            Vector2 offset = new Vector2(16, 0);
-            var style = GUI.skin.label;
+            Vector2 offset = new Vector2(4, 0);
+            var style = Styles.Tooltip;
             var gui = C(text);
             var size = style.CalcSize(gui);
             if (size.x > maxWidth)
@@ -616,7 +624,9 @@ public static partial class CoreGUI
             if (pos.y > limit.y)
                 pos.y -= size.y + offset.y * 2;
 
-            GUI.Label(new Rect(pos, size), gui);
+            size.x += 1;
+
+            style.Draw(new Rect(pos, size), gui, 0);
         }
     }
 
@@ -709,7 +719,7 @@ public static partial class CoreGUI
             return true;
         }
 
-        LayoutFadeGroup g = (LayoutFadeGroup)LayoutUtility.BeginLayoutGroup(GUIStyle.none, null, typeof(LayoutFadeGroup));
+        LayoutFadeGroup g = (LayoutFadeGroup)LayoutUtility.BeginLayoutGroup<LayoutFadeGroup>(GUIStyle.none, null);
         g.isVertical = true;
         g.resetCoords = true;
         g.fadeValue = value;

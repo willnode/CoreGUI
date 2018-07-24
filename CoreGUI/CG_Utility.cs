@@ -94,6 +94,23 @@ public static partial class CoreGUI
             BeginDisabledGroup(disabled, overriding);
             return new DisposableScope(EndDisabledGroup);
         }
+
+        public static void FadeGroup(bool expanded, Action whenExpanded)
+        {
+            if (BeginFadeGroup(expanded))
+                whenExpanded();
+            EndFadeGroup();
+        }
+
+        public static DisposableScope ChangeCheck(Action whenChanged)
+        {
+            BeginChangeCheck();
+            return new DisposableScope(() =>
+            {
+                if (EndChangeCheck())
+                    whenChanged();
+            });
+        }
     }
 
     public struct DisposableScope : IDisposable
@@ -110,7 +127,7 @@ public static partial class CoreGUI
             dispose();
         }
     }
-    
+
     public static class Utility
     {
 
@@ -154,9 +171,54 @@ public static partial class CoreGUI
             }
         }
 
+
+        public static float ScaleFromScreen(Vector2 referenceResolution, ScreenMatchMode matchMode, float matchRatio, Rect screenSize)
+        {
+            // Taken from CanvasScaler.cs of Unity UI
+            switch (matchMode)
+            {
+                case ScreenMatchMode.MatchRatio:
+
+                    // We take the log of the relative width and height before taking the average.
+                    // Then we transform it back in the original space.
+                    // the reason to transform in and out of logarithmic space is to have better behavior.
+                    // If one axis has twice resolution and the other has half, it should even out if widthOrHeight value is at 0.5.
+                    // In normal space the average would be (0.5 + 2) / 2 = 1.25
+                    // In logarithmic space the average is (-1 + 1) / 2 = 0
+                    float logWidth = Mathf.Log(screenSize.x / referenceResolution.x, 2);
+                    float logHeight = Mathf.Log(screenSize.y / referenceResolution.y, 2);
+                    float logWeightedAverage = Mathf.Lerp(logWidth, logHeight, matchRatio);
+                    return Mathf.Pow(2, logWeightedAverage);
+
+                case ScreenMatchMode.Expand:
+                    return Mathf.Min(screenSize.x / referenceResolution.x, screenSize.y / referenceResolution.y);
+                case ScreenMatchMode.Shrink:
+                    return Mathf.Max(screenSize.x / referenceResolution.x, screenSize.y / referenceResolution.y);
+                default:
+                    return 1;
+            }
+        }
+
+        public static float ScaleFromDPI(float referenceDPI)
+        {
+            var curDPI = Screen.dpi;
+            if (curDPI > 0)
+                return ScaleFromDPI(referenceDPI, curDPI);
+            else
+                return 1; // Maybe there's better idea?
+        }
+
+        public static float ScaleFromDPI(float referenceDPI, float currentDPI)
+        {
+            return currentDPI / referenceDPI;
+        }
+
         // Dictionary<"int of control ID", ValueTuple<"last returned value", "non-deferred value">>
         static Dictionary<int, ValueTuple<object, object>> _deferredValues = new Dictionary<int, ValueTuple<object, object>>();
 
+        /// <summary>
+        /// Delay value returned from widget
+        /// </summary>
         public static T GetDeferredValue<T>(T value, Func<T, T> widget)
         {
             var id = GUIUtility.GetControlID(FocusType.Passive);
@@ -172,9 +234,9 @@ public static partial class CoreGUI
                 tuple.item2 = value;
             }
 
-            var shouldSet = ev.type == EventType.MouseUp || (ev.type == EventType.KeyUp && 
+            var shouldSet = ev.type == EventType.MouseUp || (ev.type == EventType.KeyUp &&
                 (ev.keyCode == KeyCode.Tab || ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.Escape));
-            
+
             var val2 = widget((T)tuple.item2);
             {
                 if (shouldSet)
@@ -289,7 +351,7 @@ public static partial class CoreGUI
         public static GUIContent[] ToGUIContents(string[] texts, Texture2D[] textures) { return ToGUIContents(texts, textures, null); }
         public static GUIContent[] ToGUIContents(string[] texts, string[] tooltips) { return ToGUIContents(texts, null, tooltips); }
         public static GUIContent[] ToGUIContents(Texture2D[] textures, string[] tooltips) { return ToGUIContents(null, textures, tooltips); }
-        
+
         /// <summary>
         /// Create new GUIContents from array
         /// </summary>
@@ -344,6 +406,13 @@ public static partial class CoreGUI
     public enum Side
     {
         Left, Right, Top, Bottom, Inherit = -1
+    }
+
+    public enum ScreenMatchMode
+    {
+        Expand = 0,
+        Shrink = 1,
+        MatchRatio = 2,
     }
 
 }
