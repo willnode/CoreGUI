@@ -37,8 +37,7 @@ public static partial class CoreGUI
                 label = new GUIContent(label);
             }
 
-            if ((indentPolicy != IndentPolicy.None && indentPolicy != IndentPolicy.Label && indentLevel > 0) &&
-                (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
+            if ((indentLevel > 0) && (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
             {
                 LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, layoutOptions).isVertical = false;
                 Space(indentLevel * 16);
@@ -53,8 +52,7 @@ public static partial class CoreGUI
         var label = prefixLabels.Pop();
         if (label != null)
         {
-            if ((indentPolicy != IndentPolicy.None && indentPolicy != IndentPolicy.Label && indentLevel > 0) &&
-               (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
+            if ((indentLevel > 0) && (prefixLabelSide == Side.Bottom || prefixLabelSide == Side.Top))
             {
                 LayoutUtility.EndLayoutGroup();
             }
@@ -107,12 +105,12 @@ public static partial class CoreGUI
             }
         }
 
-        if (indentPolicy == IndentPolicy.Widgets || indentPolicy == IndentPolicy.Full)
+        if (indentLevel > 0 || label != null)
         {
             bool shouldEat = LayoutUtility.isVertical != prefixLabelSide >= Side.Top;
-
+            
             float offset = indentLevel * 16;
-            float width = label != null || indentPolicy == IndentPolicy.Full ? prefixLabelWidth : offset;
+            float width = label != null ? prefixLabelWidth : offset;
 
             if (!shouldEat && width > 0)
                 Space(width);
@@ -145,7 +143,7 @@ public static partial class CoreGUI
     {
         bool shouldEat = LayoutUtility.isVertical != prefixLabelSide >= Side.Top;
         var r = totalPosition;
-        var indent = indentPolicy == IndentPolicy.None ? 0 : indentLevel * 16;
+        var indent = indentLevel * 16;
         switch (prefixLabelSide)
         {
             case Side.Left:
@@ -215,17 +213,11 @@ public static partial class CoreGUI
 
     public static int indentLevel = 0;
 
-    public static IndentPolicy indentPolicy = IndentPolicy.Widgets;
-
     public static LayoutOption[] layoutOptions = new LayoutOption[] { };
 
     public static Rect Indent(Rect r, bool ignorePolicy = false)
     {
-        if (indentPolicy == IndentPolicy.Widgets || ignorePolicy)
-            r.xMin += indentLevel * 16;
-        else if (indentPolicy == IndentPolicy.Full)
-            r.xMin += prefixLabelWidth;
-
+        r.xMin += indentLevel * 16;
         return r;
     }
 
@@ -344,7 +336,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
 
         PrefixLabelStart(label);
-        BeginIndent(0, IndentPolicy.Widgets);
+        BeginIndent(0);
         {
             LayoutGroup g = LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, options);
             g.isVertical = false;
@@ -371,7 +363,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
 
         PrefixLabelStart(label);
-        BeginIndent(0, IndentPolicy.Widgets);
+        BeginIndent(0);
         {
             LayoutGroup g = LayoutUtility.BeginLayoutGroup<LayoutGroup>(GUIStyle.none, options);
             g.isVertical = true;
@@ -408,7 +400,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return scroll;
 
         ScrollGroup g = (ScrollGroup)LayoutUtility.BeginLayoutGroup<ScrollGroup>(GUIStyle.none, options);
-        switch (Event.current.type)
+        switch (ev.type)
         {
             case EventType.Layout:
                 g.resetCoords = true;
@@ -428,9 +420,26 @@ public static partial class CoreGUI
             alwaysShowHorizontal, alwaysShowVertical, Styles.HorizontalScrollbar, Styles.VerticalScrollbar);
     }
 
+    public static Vector2 DragScrollView(Vector2 scroll)
+    {
+        if (ev.type == EventType.MouseDrag && LayoutUtility.GetContainerRect().Contains(ev.mousePosition - scroll))
+        {
+            // Drag the scroll
+#if UNITY_EDITOR || !(UNITY_ANDROID || UNITY_IOS)
+            scroll -= ev.delta;
+#else
+            // Don't know why in actual mobile this Y got inverted. Bug?
+            scroll -= new Vector2(ev.delta.x, -ev.delta.y);
+#endif
+            ev.Use();
+        }
+        return scroll;
+    }
+
     public static void EndScrollView()
     {
         if (Utility.currentCustomEvent != null) return;
+
 
         LayoutUtility.EndLayoutGroup();
         GUI.EndScrollView();
@@ -441,7 +450,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return;
 
         LayoutGroup g = LayoutUtility.BeginLayoutArea<LayoutGroup>(GUIStyle.none);
-        if (Event.current.type == EventType.Layout)
+        if (ev.type == EventType.Layout)
         {
             g.resetCoords = true;
             g.minWidth = g.maxWidth = screenRect.width;
@@ -464,7 +473,7 @@ public static partial class CoreGUI
         if (Utility.currentCustomEvent != null) return;
 
         LayoutUtility.current.layoutGroups.Pop();
-        LayoutUtility.current.topLevel = (LayoutGroup)LayoutUtility.current.layoutGroups.Peek();
+        LayoutUtility.current.topLevel = LayoutUtility.current.layoutGroups.Peek();
         GUI.EndGroup();
     }
 
@@ -569,10 +578,10 @@ public static partial class CoreGUI
             Utility.delayCall = null;
         }
 
-        if (guiIndentPolicies.Count > 0)
+        if (indentLevels.Count > 0)
         {
             Debug.LogError("WARNING: You're pushing more indent stacks than popping it");
-            while (guiIndentPolicies.Count > 0)
+            while (indentLevels.Count > 0)
             {
                 EndIndent();
             }
@@ -617,7 +626,7 @@ public static partial class CoreGUI
             if (size.x > maxWidth)
                 size = new Vector2(maxWidth, style.CalcHeight(gui, maxWidth));
             var pos = ev.mousePosition + offset;
-            var limit = new Vector2(Screen.width, Screen.height) - size;
+            var limit = Utility.scaledScreenRect.size - size;
 
             if (pos.x > limit.x)
                 pos.x -= size.x + offset.x * 2;
@@ -725,9 +734,9 @@ public static partial class CoreGUI
         g.fadeValue = value;
         g.wasGUIEnabled = GUI.enabled;
         g.guiColor = GUI.color;
-        if (value != 0.0f && value != 1.0f && Event.current.type == EventType.MouseDown)
+        if (value != 0.0f && value != 1.0f && ev.type == EventType.MouseDown)
         {
-            Event.current.Use();
+            ev.Use();
         }
 
         // We don't want the fade group gui clip to be used for calculating the label width of controls in this fade group, so we lock the context width.
@@ -770,31 +779,22 @@ public static partial class CoreGUI
         GUI.enabled = enabledStacks.Pop();
     }
 
-    static Stack<ValueTuple<int, IndentPolicy>> guiIndentPolicies = new Stack<ValueTuple<int, IndentPolicy>>();
+    static Stack<int> indentLevels = new Stack<int>();
 
-    public static void BeginIndent(IndentPolicy policy)
+    public static void BeginIndent(int indent = -1)
     {
-        BeginIndent(-1, policy);
-    }
-
-    public static void BeginIndent(int indent = -1, IndentPolicy policy = IndentPolicy.Inherit)
-    {
-        guiIndentPolicies.Push(new ValueTuple<int, IndentPolicy>(indentLevel, indentPolicy));
+        indentLevels.Push(indentLevel);
 
         if (indent >= 0)
             indentLevel = indent;
         else
             indentLevel++;
-
-        if (policy != IndentPolicy.Inherit)
-            indentPolicy = policy;
     }
 
     public static void EndIndent()
     {
-        var val = guiIndentPolicies.Pop();
-        indentLevel = val.item1;
-        indentPolicy = val.item2;
+        var val = indentLevels.Pop();
+        indentLevel = val;
     }
 
     static Stack<ValueTuple<float, Side>> labelStacks = new Stack<ValueTuple<float, Side>>();

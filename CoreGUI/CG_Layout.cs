@@ -385,7 +385,7 @@ public static partial class CoreGUI
             return BeginLayoutArea<T>(style);
         }
 
-        public static LayoutGroup topLevel => current.topLevel;
+        public static LayoutGroup topLevel { get { return current.topLevel; } }
 
         public static Rect GetRect(GUIContent content, GUIStyle style) { return DoGetRect(content, style, null); }
         // Reserve layout space for a rectangle for displaying some contents with a specific style.

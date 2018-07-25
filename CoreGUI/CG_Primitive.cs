@@ -65,6 +65,7 @@ public static partial class CoreGUI
         set { if (_isEditorWindow) lastFocusEditorID = value; else lastFocusRuntimeID = value; }
     }
 
+
     static public T NumberField<T>(GUIContent label, T value, TryParseFunc<T> parser, Func<T, string> stringifier = null, Func<T, float, T> deltaProcessor = null)
     {
         BeginChangeCheck();
@@ -72,8 +73,9 @@ public static partial class CoreGUI
         var id = GUIUtility.GetControlID(FocusType.Passive);
         Rect r;
 
+        // TODO
         //if (deltaProcessor == null)
-        r = PrefixLabel(null, GUI.skin.textField, label, id + 1);
+        r = PrefixLabel(null, Styles.NumberField, label, id + 1);
         //else
         //{
         //    float delta;
@@ -88,7 +90,7 @@ public static partial class CoreGUI
             lastNumberID = -1;
         }
 
-        var v = GUI.TextField(r, lastNumberID == id ? lastNumberStr : (stringifier == null ? value.ToString() : stringifier(value)));
+        var v = GUI.TextField(r, lastNumberID == id ? lastNumberStr : (stringifier == null ? value.ToString() : stringifier(value)), Styles.NumberField);
 
         if (EndChangeCheck())
         {
@@ -109,18 +111,18 @@ public static partial class CoreGUI
     static public float HorizontalSlider(GUIContent label, float value, float min, float max)
     {
         var r = PrefixLabel(null, Styles.HorizontalSlider, label);
-        r.y += (r.height - GUI.skin.horizontalScrollbar.fixedHeight) / 2;
         var id = GUIUtility.GetControlID(FocusType.Keyboard);
 
         if (GUIUtility.keyboardControl == id && ev.type == EventType.KeyDown)
         {
             if (ev.keyCode == KeyCode.LeftArrow || ev.keyCode == KeyCode.RightArrow)
             {
+                // WIP
                 var delta = Mathf.Pow(10, Mathf.Round(Mathf.Log10(Mathf.Abs(max - min))) - 2);
                 delta *= (ev.keyCode == KeyCode.LeftArrow ? -1f : 1f) * (ev.shift ? 10f : 1f);
                 value = Mathf.Clamp(value + delta, min, max);
                 GUI.changed = true;
-                Event.current.Use();
+                ev.Use();
             }
         }
 

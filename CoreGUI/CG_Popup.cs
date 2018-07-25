@@ -36,31 +36,57 @@ public static partial class CoreGUI
             callerSkin = GUI.skin;
         }
 
+        bool isJustShown = true;
+
         public void OnGUI()
         {
             var id = GUIUtility.GetControlID(FocusType.Keyboard);
 
             position = GUI.ModalWindow(id, position, (idd) =>
             {
+                // We gonna recalculate scales here....
                 var local = position;
                 local.position = Vector2.zero;
+                
+                // local == Window client rect.
+                // Now pad it
                 var paddedlocal = PopupStyle.padding.Remove(local);
+                local = PopupStyle.padding.Add(local);
+
+                // Rescale everything down.
+                paddedlocal.position *= callerScale;
                 paddedlocal.size *= callerScale;
                 local.size *= callerScale;
-                local.position = -paddedlocal.position;
+                local.position *= callerScale;
 
                 BeginGUI(idd, paddedlocal, callerSkin, callerScale);
 
                 OnWindowGUI(idd);
 
+                Vector2 mouseEv = ev.mousePosition;
+
+                if (ev.type == EventType.Ignore && mouseEv.sqrMagnitude == float.PositiveInfinity)
+                {
+                    // Yeah... True... Happens on Android as mouse == emulated touch and no touches available
+                    // Frankly Input.mousePosition caches last known mouse position so.....
+                    mouseEv = GUIUtility.ScreenToGUIPoint(Input.mousePosition);
+                }
+
                 // Quit when mouse clicks outside window.
                 // Ugly workaround. But works.
-                if (!IsPersistent && ((ev.type == EventType.Ignore && !local.Contains(ev.mousePosition))
+                if (!IsPersistent && ((ev.type == EventType.Ignore && !local.Contains(mouseEv))
                 || (ev.type == EventType.KeyUp && ev.keyCode == KeyCode.Escape)))
                 {
-                    Close(); // Force close
-                    ev.Use();
+                    if (!isJustShown)
+                    {
+                        Close(); // Force close
+                        ev.Use();
+                    }
+                    else
+                        isJustShown = false;
                 }
+                else if (isJustShown && (ev.type == EventType.MouseUp || ev.type == EventType.KeyUp))
+                    isJustShown = false;
 
                 EndGUI();
 
@@ -91,6 +117,7 @@ public static partial class CoreGUI
                 k.Close();
             }
 
+            popup.isJustShown = true;
             shownPopup.Add(popup.callerGUIID, popup);
         }
 
@@ -100,7 +127,8 @@ public static partial class CoreGUI
             if (shouldBePutInBottom)
                 position.y += position.height; // If position == widget rect, show under it.
             position.size = Vector2.Max(position.size, GetSize());
-            position.position = Vector2.Max(Vector2.zero, Vector2.Min(position.position, new Vector2(Screen.width, Screen.height) - position.size));
+            position.position = Vector2.Max(Vector2.zero, Vector2.Min(position.position, 
+                Utility.scaledScreenRect.size - position.size));
         }
     }
 
@@ -111,7 +139,7 @@ public static partial class CoreGUI
         public override Vector2 GetSize()
         {
             var g = Vector2.zero;
-            var style = Styles.MiniButton;
+            var style = Styles.MenuItem;
 
             foreach (var item in popups)
             {
@@ -121,14 +149,18 @@ public static partial class CoreGUI
             }
 
             g.x += style.margin.horizontal;
+            g.y += PopupStyle.padding.vertical;
+            g.x += PopupStyle.padding.horizontal;
             return g;
         }
+
+        public override GUIStyle PopupStyle { get { return Styles.MenuWindow; } }
 
         public override void OnWindowGUI(int id)
         {
             for (int i = 0; i < popups.Count; i++)
             {
-                if (Button(popups[i].content, Styles.MiniButton))
+                if (Button(popups[i].content, Styles.MenuItem))
                 {
                     Apply(popups[i].value);
                     Close();
@@ -178,6 +210,8 @@ public static partial class CoreGUI
 
         const string kCommandName = "PopupCallback";
 
+        const KeyCode kCommandKey = (KeyCode)8642;
+
         public static Action<object> MakeCallback(int id)
         {
             if (id == 0)
@@ -190,20 +224,7 @@ public static partial class CoreGUI
             return delegate (object o)
             {
                 _pendingObjects[id] = o;
-                Event e;
-#if UNITY_EDITOR
-                if (Utility.isEditorWindow)
-                {
-                    e = UnityEditor.EditorGUIUtility.CommandEvent(kCommandName);
-                }
-                else
-#endif
-                {
-                    e = new Event(ev);
-                    e.type = EventType.ExecuteCommand;
-                    e.commandName = kCommandName;
-                }
-                Utility.SendEvent(e, iid);
+                Utility.SendEvent(kCommandName, kCommandKey, iid);
             };
         }
 
@@ -213,15 +234,17 @@ public static partial class CoreGUI
                 Debug.LogWarning("You're trying to request an object with null ID");
 
             // Because Layout must be sync with other events...
-            if (ev.type == EventType.ExecuteCommand && ev.commandName == kCommandName)
-            {
-                object o;
-                if (_pendingObjects.TryGetValue(id, out o))
+            if (ev.type == EventType.ExecuteCommand)
+                if (ev.commandName == kCommandName || ev.keyCode == kCommandKey)
                 {
-                    _pendingObjects.Remove(id);
-                    return o;
+                    object o;
+                    if (_pendingObjects.TryGetValue(id, out o))
+                    {
+                        _pendingObjects.Remove(id);
+                        return o;
+                    }
                 }
-            }
+
             return null;
         }
     }
@@ -268,7 +291,7 @@ public static partial class CoreGUI
                 }
                 using (Scoped.Horizontal())
                 {
-                    hsl = MiniButtons(null, hsvOps, hsl ? 1 : 0) == 1;
+                    hsl = HorizontalButtons(null, hsvOps, hsl ? 1 : 0) == 1;
                     Toggle(C("Normalized"), true, Styles.MiniButton);
                 }
 
@@ -335,7 +358,7 @@ public static partial class CoreGUI
     {
         public override Vector2 GetSize()
         {
-            return new Vector2(500, 200);
+            return new Vector2(500, 200) / Mathf.Max(1, _currentScale);
         }
 
         public override bool IsPersistent { get { return true; } }
@@ -383,7 +406,7 @@ public static partial class CoreGUI
             Utility.delayCall += delegate
             {
                 var r = new Rect(Vector2.zero, GetSize());
-                r.center = Utility.screenRect.center;
+                r.center = Utility.scaledScreenRect.center;
                 this.SetSafePosition(r, false);
             };
         }
@@ -411,9 +434,9 @@ public static partial class CoreGUI
 
         public static void Show(int id, string title, string message, params string[] buttons)
         {
-            Show(PopupCallback.MakeCallback(id), new GUIContent(title), new GUIContent(message), Utility.ToGUIContents(buttons));            
+            Show(PopupCallback.MakeCallback(id), new GUIContent(title), new GUIContent(message), Utility.ToGUIContents(buttons));
         }
-        
+
         public static void Show(int id, GUIContent title, GUIContent message, GUIContent[] buttons)
         {
             Show(PopupCallback.MakeCallback(id), title, message, buttons);

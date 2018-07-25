@@ -80,20 +80,25 @@ public static partial class CoreGUI
         return value;
     }
 
-    public static int MiniButtons(GUIContent label, GUIContent[] contents, int selected, int offset = 0)
+    public static int HorizontalButtons(GUIContent label, GUIContent[] contents, int selected, int offset = 0)
+    {
+        return HorizontalButtons(label, contents, selected, offset, Styles.MiniButtons);
+    }
+
+    public static int HorizontalButtons(GUIContent label, GUIContent[] contents, int selected, int offset, GUIStyleVariants style)
     {
         BeginHorizontal(label);
 
-        if (contents.Length > 0 && Toggle(contents[0], selected == offset + 0, contents.Length == 1 ? Styles.MiniButton : Styles.MiniButtonLeft))
+        if (contents.Length > 0 && Toggle(contents[0], selected == offset + 0, contents.Length == 1 ? style.Normal : style.Left))
             selected = 0 + offset;
 
         for (int i = 1; i < contents.Length - 1; i++)
         {
-            if (Toggle(contents[i], selected == offset + i, Styles.MiniButtonMid))
+            if (Toggle(contents[i], selected == offset + i, style.Mid))
                 selected = i + offset;
         }
 
-        if (contents.Length > 1 && Toggle(contents[contents.Length - 1], selected == offset + contents.Length - 1, Styles.MiniButtonRight))
+        if (contents.Length > 1 && Toggle(contents[contents.Length - 1], selected == offset + contents.Length - 1, style.Right))
             selected = contents.Length - 1 + offset;
 
         EndHorizontal();

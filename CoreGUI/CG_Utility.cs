@@ -48,15 +48,10 @@ public static partial class CoreGUI
             BeginVertical(label);
             return new DisposableScope(EndVertical);
         }
-
-        public static DisposableScope Indent(IndentPolicy policy)
+        
+        public static DisposableScope Indent(int indent = -1)
         {
-            return Indent(-1, policy);
-        }
-
-        public static DisposableScope Indent(int indent = -1, IndentPolicy policy = IndentPolicy.Inherit)
-        {
-            BeginIndent(indent, policy);
+            BeginIndent(indent);
             return new DisposableScope(EndIndent);
         }
 
@@ -135,6 +130,12 @@ public static partial class CoreGUI
         /// Screen size Rect shortcut
         /// </summary>
         public static Rect screenRect { get { return new Rect(0, 0, Screen.width, Screen.height); } }
+
+
+        /// <summary>
+        /// Screen size Rect / currentScale shortcut
+        /// </summary>
+        public static Rect scaledScreenRect { get { return new Rect(0, 0, Screen.width / _currentScale, Screen.height / _currentScale); } }
 
         /// <summary>
         /// Delegate to be called once before EndGUI()
@@ -286,6 +287,32 @@ public static partial class CoreGUI
         }
 
         /// <summary>
+        /// Send custom ExecuteCommand event.
+        /// (the executeCommandKey is sent to Event.keyCode for IL2CPP bug workaround)
+        /// (executeCommandKey can accept any short value, don't have to what exist in enumeration)
+        /// </summary>
+        public static void SendEvent(string executeCommandName, KeyCode executeCommandKey, int GUIID = 0)
+        {
+            Event e;
+#if UNITY_EDITOR
+            if (isEditorWindow)
+            {
+                e = UnityEditor.EditorGUIUtility.CommandEvent(executeCommandName);
+                e.keyCode = executeCommandKey;
+            }
+            else
+#endif
+            {
+                e = new Event(ev);
+                e.type = EventType.ExecuteCommand;
+                e.commandName = executeCommandName;
+                e.keyCode = executeCommandKey;
+            }
+            SendEvent(e, GUIID);
+        }
+
+
+        /// <summary>
         /// High DPI scaling factor similar to EditorGUILayout.pixelsPerPoint
         /// </summary>
         public static float pixelsPerPoint { get { return _pixelsPerPoint(); } }
@@ -326,12 +353,24 @@ public static partial class CoreGUI
         static GUILayoutOption[] _xNoPand = new GUILayoutOption[] { };
 
         /// <summary>
-        /// Reserve a position from Unity's GUILayout
+        /// Reserve and get a position from Unity's GUILayout
         /// </summary>
         public static Rect BindFromGUILayout(bool expanded = true)
         {
             Rect r = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, expanded ? _xPand : _xNoPand);
             return GetSafeRect(r);
+        }
+
+        /// <summary>
+        /// Get screen position from RectTransform of Overlay-based UI Canvas
+        /// </summary>
+        public static Rect BindFromUIOverlay(RectTransform transform, float padding = 0)
+        {
+            var min = transform.TransformPoint(transform.rect.min);
+            var max = transform.TransformPoint(transform.rect.max);
+            min.y = Screen.height - min.y;
+            max.y = Screen.height - max.y;
+            return Rect.MinMaxRect(min.x + padding, max.y + padding, max.x - padding, min.y - padding);
         }
 
         /// <summary>
@@ -376,33 +415,8 @@ public static partial class CoreGUI
 
             return result;
         }
-
     }
-
-    public enum IndentPolicy
-    {
-        /// <summary>
-        /// Apply indentation only to labelled widgets
-        /// </summary>
-        Label = 0,
-        /// <summary>
-        /// Apply indentation to widgets both labelled and unlabelled widgets
-        /// </summary>
-        Widgets = 1,
-        /// <summary>
-        /// Always prefix widgets even if there's no label before it
-        /// </summary>
-        Full = 2,
-        /// <summary>
-        /// Disable indenting
-        /// </summary>
-        None = 3,
-        /// <summary>
-        /// Used only for BeginIndent. Use previous setting.
-        /// </summary>
-        Inherit = -1,
-    }
-
+    
     public enum Side
     {
         Left, Right, Top, Bottom, Inherit = -1

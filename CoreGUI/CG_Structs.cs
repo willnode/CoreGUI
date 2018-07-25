@@ -40,7 +40,7 @@ public static partial class CoreGUI
                 }
                 GUI.color = oldC;
             }
-            else if (ev.type == EventType.MouseDown && r.Contains(ev.mousePosition))
+            else if (ev.type == EventType.MouseUp && r.Contains(ev.mousePosition))
             {
                 ColorDialogPopup.Show(id, color);
             }
