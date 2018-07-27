@@ -1269,16 +1269,21 @@ public static partial class CoreGUI
             if (options == null)
                 return;
 
+            // Changed implementation from original UT's way handling this:
+            // If user only specifies MinWidth, then MaxWidth still assumes to be Infinite 
+            // (instead of the same with MinWidth).
+            // This avoid having ugly workaround like Layout.MaxWidth(999999)
+
             foreach (LayoutOption i in options)
             {
                 switch (i.type)
                 {
                     case LayoutOption.Type.fixedWidth: minWidth = maxWidth = i.value; stretchWidth = 0; break;
                     case LayoutOption.Type.fixedHeight: minHeight = maxHeight = i.value; stretchHeight = 0; break;
-                    case LayoutOption.Type.minWidth: minWidth = i.value; if (maxWidth < minWidth) maxWidth = minWidth; break;
+                    case LayoutOption.Type.minWidth: minWidth = i.value; if (maxWidth == 0) maxWidth = float.PositiveInfinity; if (maxWidth < minWidth) maxWidth = minWidth; break;
                     case LayoutOption.Type.maxWidth: maxWidth = i.value; if (minWidth > maxWidth) minWidth = maxWidth; stretchWidth = 0; break;
                     case LayoutOption.Type.minHeight: minHeight = i.value; if (maxHeight < minHeight) maxHeight = minHeight; break;
-                    case LayoutOption.Type.maxHeight: maxHeight = i.value; if (minHeight > maxHeight) minHeight = maxHeight; stretchHeight = 0; break;
+                    case LayoutOption.Type.maxHeight: maxHeight = i.value; if (maxHeight == 0) maxHeight = float.PositiveInfinity; if (minHeight > maxHeight) minHeight = maxHeight; stretchHeight = 0; break;
                     case LayoutOption.Type.stretchWidth: stretchWidth = i.value; break;
                     case LayoutOption.Type.stretchHeight: stretchHeight = i.value; break;
                 }

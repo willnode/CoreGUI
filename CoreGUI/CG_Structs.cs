@@ -19,7 +19,11 @@ public static partial class CoreGUI
             var id = GUIUtility.GetControlID(FocusType.Keyboard);
 #if UNITY_EDITOR
             if (Utility.isEditorWindow)
+#if UNITY_2017 || UNITY_5
+                return UnityEditor.EditorGUI.ColorField(r, GUIContent.none, color, true, alpha, false, null);
+#else
                 return UnityEditor.EditorGUI.ColorField(r, GUIContent.none, color, true, alpha, false);
+#endif
 #endif
             if (ev.type == EventType.Repaint)
             {
