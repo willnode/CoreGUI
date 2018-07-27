@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using UnityEngine;
 
 public static partial class CoreGUI
@@ -9,7 +8,7 @@ public static partial class CoreGUI
     public abstract class PopupBase
     {
         public static Dictionary<int, PopupBase> shownPopup = new Dictionary<int, PopupBase>();
-
+        
         public virtual GUIContent PopupContent { get { return GUIContent.none; } }
 
         public virtual GUIStyle PopupStyle { get { return Styles.Window; } }
