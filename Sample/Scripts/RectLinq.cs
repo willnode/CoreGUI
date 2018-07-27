@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using UnityEngine;
 
 // Free Utility: Rect as Linq :)
 public static class RectLinq
@@ -63,6 +58,26 @@ public static class RectLinq
         r.y += amount.y;
         r.width -= amount.x * 2;
         r.height -= amount.y * 2;
+        return r;
+    }
+    
+    public static Rect Shrink(this Rect r, CoreGUI.Side side, float amount)
+    {
+        switch (side)
+        {
+            case CoreGUI.Side.Left:
+                r.xMin += amount;
+                break;
+            case CoreGUI.Side.Right:
+                r.xMax -= amount;
+                break;
+            case CoreGUI.Side.Top:
+                r.yMin += amount;
+                break;
+            case CoreGUI.Side.Bottom:
+                r.yMax -= amount;
+                break;
+        }
         return r;
     }
 

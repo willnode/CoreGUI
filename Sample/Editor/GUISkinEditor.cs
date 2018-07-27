@@ -108,24 +108,18 @@ public class GUISkinEditor : Editor
                             var a = s.customStyles;
                             var sel = Array.IndexOf(a, selected);
                             if (sel < 0)
-                                sel = a.Length;
+                                sel = Mathf.Max(0, a.Length - 1);
                             if (selectedAct == 0)
                             {
-                                var b = new GUIStyle[a.Length + 1];
-                                if (sel > 0)
-                                    Array.Copy(a, 0, b, 0, sel);
-                                b[sel] = new GUIStyle(selected ?? GUIStyle.none);
-                                if (sel < a.Length)
-                                    Array.Copy(a, sel, b, sel + 1, a.Length - sel);
-                                s.customStyles = b;
+                                var styles = s.customStyles;
+                                ArrayUtility.Insert(ref styles, styles.Length == 0 ? 0 : sel + 1, 
+                                    new GUIStyle(selected ?? GUIStyle.none));
+                                s.customStyles = styles;
                             } else
                             {
-                                var b = new GUIStyle[a.Length - 1];
-                                if (sel > 0)
-                                    Array.Copy(a, 0, b, 0, sel);
-                                if (sel < a.Length)
-                                    Array.Copy(a, sel + 1, b, sel, a.Length - sel - 1);
-                                s.customStyles = b;
+                                var styles = s.customStyles;
+                                ArrayUtility.RemoveAt(ref styles, sel);
+                                s.customStyles = styles;
                             }
                         }
                         foreach (var style in s.customStyles)
@@ -151,13 +145,12 @@ public class GUISkinEditor : Editor
                             selected.name = TextField(C("Name"), selected.name);
                         }
 
-                        FlexibleSpace();
+                        var r = FlexibleSpace();
 
                         using (Scoped.DisabledGroup(false, true))
                         {
                             if (ev.type == EventType.Repaint)
                             {
-                                var r = LayoutUtility.GetLastRect();
                                 var center = r.center;
                                 r.size *= 0.5f;
                                 r.center = center;

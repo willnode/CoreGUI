@@ -481,9 +481,12 @@ public static partial class CoreGUI
                 case EventType.Used:
                     return kDummyRect;
                 default:
-                    var r = current.topLevel.rect;
+                    var top = current.topLevel;
+                    var r = top.rect;
+                    if (top.resetCoords)
+                        r.position = Vector2.zero;
                     if (unpacked)
-                        r = current.topLevel.margin.Add(r);
+                        r = top.margin.Add(r);
                     return r;
             }
         }
@@ -531,6 +534,7 @@ public static partial class CoreGUI
                 {
                     s_SpaceStyle = new GUIStyle();
                     s_SpaceStyle.stretchWidth = false;
+                    s_SpaceStyle.stretchHeight = false;
                 }
                 return s_SpaceStyle;
             }

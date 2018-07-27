@@ -256,18 +256,22 @@ public static partial class CoreGUI
     {
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
 
-        Rect r;
+        Rect r, cont = LayoutUtility.GetContainerRect();
         if (LayoutUtility.isVertical)
         {
             var arr = ArrayPool<LayoutOption>.Get(Layout.Height(pixels));
             r = LayoutUtility.GetRect(0, pixels, LayoutUtility.spaceStyle, arr);
             ArrayPool<LayoutOption>.Release(arr);
+            r.x = cont.x;
+            r.width = cont.width;
         }
         else
         {
             var arr = ArrayPool<LayoutOption>.Get(Layout.Width(pixels));
             r = LayoutUtility.GetRect(pixels, 0, LayoutUtility.spaceStyle, arr);
             ArrayPool<LayoutOption>.Release(arr);
+            r.y = cont.y;
+            r.height = cont.height;
         }
 
         return r;
@@ -279,11 +283,26 @@ public static partial class CoreGUI
     public static Rect FlexibleSpace()
     {
         if (Utility.currentCustomEvent != null) return LayoutUtility.kDummyRect;
-
+        
+        Rect r, cont = LayoutUtility.GetContainerRect();
         if (LayoutUtility.isVertical)
-            return LayoutUtility.GetRect(0, 0, GUIStyle.none, Layout.ExpandHeight(true));
+        {
+            var arr = ArrayPool<LayoutOption>.Get(Layout.ExpandHeight(true));
+            r = LayoutUtility.GetRect(0, 0, GUIStyle.none, arr);
+            ArrayPool<LayoutOption>.Release(arr);
+            r.x = cont.x;
+            r.width = cont.width;
+        }
         else
-            return LayoutUtility.GetRect(0, 0, GUIStyle.none, Layout.ExpandWidth(true));
+        {
+            var arr = ArrayPool<LayoutOption>.Get(Layout.ExpandWidth(true));
+            r = LayoutUtility.GetRect(0, 0, GUIStyle.none, arr);
+            ArrayPool<LayoutOption>.Release(arr);
+            r.y = cont.y;
+            r.height = cont.height;
+        }
+
+        return r;
     }
 
     #endregion
@@ -460,14 +479,7 @@ public static partial class CoreGUI
 
         GUI.BeginGroup(g.rect, GUIContent.none, GUIStyle.none);
     }
-
-    public static void BeginArea(Rect screenRect, GUIStyle style)
-    {
-        if (style != null)
-            GUI.Box(screenRect, GUIContent.none, style);
-        BeginArea(screenRect);
-    }
-
+    
     public static void EndArea()
     {
         if (Utility.currentCustomEvent != null) return;

@@ -47,7 +47,7 @@ public static partial class CoreGUI
                 // We gonna recalculate scales here....
                 var local = position;
                 local.position = Vector2.zero;
-                
+
                 // local == Window client rect.
                 // Now pad it
                 var paddedlocal = PopupStyle.padding.Remove(local);
@@ -127,7 +127,7 @@ public static partial class CoreGUI
             if (shouldBePutInBottom)
                 position.y += position.height; // If position == widget rect, show under it.
             position.size = Vector2.Max(position.size, GetSize());
-            position.position = Vector2.Max(Vector2.zero, Vector2.Min(position.position, 
+            position.position = Vector2.Max(Vector2.zero, Vector2.Min(position.position,
                 Utility.scaledScreenRect.size - position.size));
         }
     }
@@ -275,11 +275,10 @@ public static partial class CoreGUI
 
         public override void OnWindowGUI(int id)
         {
-            //using (Scoped.Indent())
             using (Scoped.LabelOption(16, Side.Left))
             {
                 {
-                    var r = Reserve(3f);
+                    var r = FlexibleSpace();
                     if (ev.type == EventType.Repaint)
                     {
                         var tint = GUI.color;
@@ -292,7 +291,13 @@ public static partial class CoreGUI
                 using (Scoped.Horizontal())
                 {
                     hsl = HorizontalButtons(null, hsvOps, hsl ? 1 : 0) == 1;
-                    Toggle(C("Normalized"), true, Styles.MiniButton);
+                    using (Scoped.LayoutOption(Layout.MinWidth(100)))
+                    using (Scoped.ChangeCheck(() => { if (!alpha) color.a = 1; }))
+                    using (Scoped.LabelOption(16))
+                    {
+                        color = NumberField(C("#"), color, (string x, out Color y) => ColorUtility.TryParseHtmlString("#" + x, out y),
+                            (x) => alpha ? ColorUtility.ToHtmlStringRGBA(x) : ColorUtility.ToHtmlStringRGB(x));
+                    }
                 }
 
                 if (!hsl)
